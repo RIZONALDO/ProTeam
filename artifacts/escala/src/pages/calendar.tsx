@@ -391,7 +391,7 @@ function CalendarDay({
       </div>
 
       {isCurrentMonth && (
-        <div className="flex flex-col gap-0.5 flex-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-col gap-0.5 flex-1">
           <DroppableSlot
             slotId={`${dateStr}:main`}
             duo={schedule?.mainDuo}
