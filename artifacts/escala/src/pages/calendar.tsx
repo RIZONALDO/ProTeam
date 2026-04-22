@@ -318,9 +318,8 @@ function CalendarDay({
   dayOverrides: DayOverride[];
   globalExpanded: boolean;
 }) {
-  const [hovered, setHovered] = useState(false);
   const [localExpanded, setLocalExpanded] = useState(false);
-  const effectiveExpanded = globalExpanded || hovered || localExpanded;
+  const effectiveExpanded = globalExpanded || localExpanded;
 
   const dateStr = format(date, "yyyy-MM-dd");
   const today = isToday(date);
@@ -338,22 +337,19 @@ function CalendarDay({
 
   return (
     <div
-      className={`group relative flex flex-col p-1.5 border rounded-lg transition-[min-height,background-color,border-color,box-shadow] duration-300 ease-out
-        ${effectiveExpanded ? "min-h-[155px]" : "min-h-[110px]"}
+      className={`group relative flex flex-col p-1.5 border rounded-lg transition-[background-color,border-color,box-shadow] duration-200 ease-out min-h-[110px]
         ${!isCurrentMonth ? "opacity-30 bg-muted/20 pointer-events-none" : "bg-card hover:bg-muted/10 cursor-pointer"}
         ${today ? "ring-2 ring-primary" : ""}
         ${alertSeverity === "error" ? "border-destructive/60" : alertSeverity === "warning" ? "border-amber-400/60" : "border-border"}
       `}
       onClick={() => isCurrentMonth && onDayClick(dateStr)}
     >
-      {/* Cabeçalho clicável — abre detalhes do dia; hover aqui expande os integrantes */}
+      {/* Cabeçalho clicável — abre detalhes do dia */}
       <div
         className={`flex items-center justify-between rounded px-0.5 -mx-0.5 mb-1 pb-1
           border-b border-border/40 group-hover:border-primary/30
           group-hover:bg-primary/5 transition-all duration-200 ease-out cursor-pointer`}
         title="Clique para ver detalhes do dia"
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
       >
         <span
           className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full
@@ -1081,7 +1077,7 @@ export default function Calendar() {
                 </div>
               ))}
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1" style={{ overflowAnchor: "none" }}>
               {Array.from({ length: Math.ceil(allDays.length / 7) }, (_, weekIdx) => {
                 const weekDays = allDays.slice(weekIdx * 7, weekIdx * 7 + 7);
                 const monday = weekDays[1] ?? weekDays.find((d) => d !== null) ?? null;
@@ -1112,7 +1108,7 @@ export default function Calendar() {
                     )}
                     <div className="grid grid-cols-7 gap-1">
                       {weekDays.map((date, idx) => {
-                        if (!date) return <div key={`pad-${weekIdx}-${idx}`} className={`transition-[min-height] duration-300 ease-out ${expanded ? "min-h-[155px]" : "min-h-[110px]"}`} />;
+                        if (!date) return <div key={`pad-${weekIdx}-${idx}`} className="min-h-[110px]" />;
                         const dateStr = format(date, "yyyy-MM-dd");
                         const schedule = getMergedSchedule(dateStr);
                         return (
