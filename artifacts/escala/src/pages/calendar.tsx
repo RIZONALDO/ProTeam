@@ -52,6 +52,7 @@ import {
   UserCheck,
   LayoutList,
   LayoutGrid,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,6 +71,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Member = { id: number; name: string; photoUrl?: string | null };
 
@@ -292,7 +294,7 @@ function CalendarDay({
   onClearSlot,
   onDayClick,
   dayOverrides,
-  expanded,
+  globalExpanded,
 }: {
   date: Date;
   schedule?: DaySchedule;
@@ -302,12 +304,21 @@ function CalendarDay({
   onClearSlot: (date: string, role: "main" | "side" | "off") => void;
   onDayClick: (date: string) => void;
   dayOverrides: DayOverride[];
-  expanded: boolean;
+  globalExpanded: boolean;
 }) {
+  const [hovered, setHovered] = useState(false);
+  const [localExpanded, setLocalExpanded] = useState(false);
+  const effectiveExpanded = globalExpanded || hovered || localExpanded;
+
   const dateStr = format(date, "yyyy-MM-dd");
   const today = isToday(date);
   const alertSeverity = dayAlerts.get(dateStr);
   const hasNote = !!(schedule?.notes?.trim());
+  const hasDuosWithMembers =
+    isCurrentMonth &&
+    [schedule?.mainDuo, schedule?.sideDuo, schedule?.offDuo].some(
+      (d) => d && (d.members ?? []).length > 0
+    );
   const hasOverride = dayOverrides.length > 0;
 
   const overridesForDuo = (duoId?: number | null) =>
@@ -315,13 +326,15 @@ function CalendarDay({
 
   return (
     <div
-      className={`group relative flex flex-col p-1.5 border rounded-lg transition-colors
-        ${expanded ? "min-h-[155px]" : "min-h-[110px]"}
+      className={`group relative flex flex-col p-1.5 border rounded-lg transition-all duration-150
+        ${effectiveExpanded ? "min-h-[155px]" : "min-h-[110px]"}
         ${!isCurrentMonth ? "opacity-30 bg-muted/20 pointer-events-none" : "bg-card hover:bg-muted/10 cursor-pointer"}
         ${today ? "ring-2 ring-primary" : ""}
         ${alertSeverity === "error" ? "border-destructive/60" : alertSeverity === "warning" ? "border-amber-400/60" : "border-border"}
       `}
       onClick={() => isCurrentMonth && onDayClick(dateStr)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       <div className="flex items-center justify-between mb-1">
         <span
@@ -363,6 +376,17 @@ function CalendarDay({
               <TooltipContent>Aviso neste dia</TooltipContent>
             </Tooltip>
           )}
+          {hasDuosWithMembers && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setLocalExpanded((v) => !v); }}
+              title={localExpanded ? "Ocultar integrantes" : "Ver integrantes"}
+              className={`rounded p-0.5 transition-colors hover:bg-muted
+                ${localExpanded ? "text-primary" : "text-muted-foreground hover:text-foreground"}
+                md:opacity-0 md:group-hover:opacity-100 opacity-100 transition-opacity`}
+            >
+              <Users className="h-3 w-3" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -374,7 +398,7 @@ function CalendarDay({
             label="Principal"
             onClear={() => onClearSlot(dateStr, "main")}
             hasOverride={overridesForDuo(schedule?.mainDuoId).length > 0}
-            expanded={expanded}
+            expanded={effectiveExpanded}
             slotOverrides={overridesForDuo(schedule?.mainDuoId)}
           />
           <DroppableSlot
@@ -383,7 +407,7 @@ function CalendarDay({
             label="Lateral"
             onClear={() => onClearSlot(dateStr, "side")}
             hasOverride={overridesForDuo(schedule?.sideDuoId).length > 0}
-            expanded={expanded}
+            expanded={effectiveExpanded}
             slotOverrides={overridesForDuo(schedule?.sideDuoId)}
           />
           <DroppableSlot
@@ -392,7 +416,7 @@ function CalendarDay({
             label="Folga"
             onClear={() => onClearSlot(dateStr, "off")}
             hasOverride={overridesForDuo(schedule?.offDuoId).length > 0}
-            expanded={expanded}
+            expanded={effectiveExpanded}
             slotOverrides={overridesForDuo(schedule?.offDuoId)}
           />
         </div>
@@ -447,6 +471,8 @@ function DayDialog({
   const [subForm, setSubForm] = useState<SubstituteFormState | null>(null);
   const [savingSub, setSavingSub] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const { hasPermission } = useAuth();
+  const canSubstitute = hasPermission("calendar:substituir_membro");
 
   if (!selectedDay) return null;
 
@@ -550,29 +576,31 @@ function DayDialog({
                               <span className="text-xs truncate">{member.name}</span>
                             </div>
                           )}
-                          <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover/member:opacity-100 transition-opacity">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-6 w-6 text-primary hover:text-primary hover:bg-primary/10"
-                              title={override ? "Editar substituição" : "Substituir integrante"}
-                              onClick={() => openSubForm(duo, member, override)}
-                            >
-                              <ArrowLeftRight className="h-3 w-3" />
-                            </Button>
-                            {override && (
+                          {canSubstitute && (
+                            <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover/member:opacity-100 transition-opacity">
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                title="Remover substituição"
-                                disabled={deletingId === override.id}
-                                onClick={() => handleDeleteOverride(override.id)}
+                                className="h-6 w-6 text-primary hover:text-primary hover:bg-primary/10"
+                                title={override ? "Editar substituição" : "Substituir integrante"}
+                                onClick={() => openSubForm(duo, member, override)}
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <ArrowLeftRight className="h-3 w-3" />
                               </Button>
-                            )}
-                          </div>
+                              {override && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Remover substituição"
+                                  disabled={deletingId === override.id}
+                                  onClick={() => handleDeleteOverride(override.id)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })
@@ -1076,7 +1104,7 @@ export default function Calendar() {
                             onClearSlot={handleClearSlot}
                             onDayClick={handleDayClick}
                             dayOverrides={overridesByDate.get(dateStr) ?? []}
-                            expanded={expanded}
+                            globalExpanded={expanded}
                           />
                         );
                       })}

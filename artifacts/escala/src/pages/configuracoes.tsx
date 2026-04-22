@@ -54,6 +54,7 @@ type AccessProfile = {
 const ALL_MENU_ITEMS = [
   { path: "/", label: "Dashboard" },
   { path: "/calendar", label: "Calendário" },
+  { path: "calendar:substituir_membro", label: "↔ Substituir integrante do dia" },
   { path: "/escala-semanal", label: "Escala Semanal" },
   { path: "/escala-mensal", label: "Escala Mensal" },
   { path: "/duplas", label: "Duplas" },
