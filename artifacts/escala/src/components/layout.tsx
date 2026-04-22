@@ -13,11 +13,14 @@ import {
   ChevronRight,
   Settings,
   LogOut,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { toast } from "sonner";
 
 const NAV_ITEMS = [
@@ -39,6 +42,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [companyName, setCompanyName] = useState<string | null>(null);
 
   const { user, logout, hasPermission } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     fetch("/api/settings", { credentials: "include" })
@@ -97,7 +101,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <NavLink key={item.href} item={item} onClick={() => setMobileMenuOpen(false)} />
         ))}
       </nav>
-      <div className="p-4 border-t border-sidebar-border mt-auto">
+      <div className="p-4 border-t border-sidebar-border mt-auto space-y-3">
+        <button
+          onClick={toggleTheme}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          {theme === "dark" ? "Modo claro" : "Modo escuro"}
+        </button>
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
@@ -153,8 +164,27 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
 
-          {/* Collapse button — right below nav items */}
-          <div className="px-2 pt-1">
+          {/* Theme toggle + Collapse button */}
+          <div className="px-2 pt-1 space-y-0.5">
+            <button
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Modo claro" : "Modo escuro"}
+              className={`w-full flex items-center py-2.5 rounded-xl text-sm text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors ${
+                collapsed ? "justify-center px-2" : "px-3 gap-2"
+              }`}
+            >
+              {theme === "dark" ? (
+                <>
+                  <Sun className="h-4 w-4 flex-shrink-0" />
+                  {!collapsed && <span>Modo claro</span>}
+                </>
+              ) : (
+                <>
+                  <Moon className="h-4 w-4 flex-shrink-0" />
+                  {!collapsed && <span>Modo escuro</span>}
+                </>
+              )}
+            </button>
             <button
               onClick={() => setCollapsed((v) => !v)}
               title={collapsed ? "Expandir menu" : "Recolher menu"}
