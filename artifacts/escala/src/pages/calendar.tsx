@@ -333,15 +333,15 @@ function CalendarDay({
         ${alertSeverity === "error" ? "border-destructive/60" : alertSeverity === "warning" ? "border-amber-400/60" : "border-border"}
       `}
       onClick={() => isCurrentMonth && onDayClick(dateStr)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
-      {/* Cabeçalho clicável — abre detalhes do dia */}
+      {/* Cabeçalho clicável — abre detalhes do dia; hover aqui expande os integrantes */}
       <div
         className={`flex items-center justify-between rounded px-0.5 -mx-0.5 mb-1 pb-1
           border-b border-border/40 group-hover:border-primary/30
           group-hover:bg-primary/5 transition-all duration-150 cursor-pointer`}
         title="Clique para ver detalhes do dia"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
         <span
           className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full
