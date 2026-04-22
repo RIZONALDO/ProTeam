@@ -23,7 +23,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Building2, Users, KeyRound, ShieldCheck } from "lucide-react";
+import { Plus, Pencil, Trash2, Building2, Users, KeyRound, ShieldCheck, ImagePlus, X } from "lucide-react";
 
 type AppUser = {
   id: number;
@@ -60,6 +60,9 @@ export default function Configuracoes() {
 
   const [companyName, setCompanyName] = useState("");
   const [companyNameInput, setCompanyNameInput] = useState("");
+  const [appLogo, setAppLogo] = useState<string | null>(null);
+  const [appLogoPreview, setAppLogoPreview] = useState<string | null>(null);
+  const [savingLogo, setSavingLogo] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -86,6 +89,7 @@ export default function Configuracoes() {
         const name = data["company_name"] ?? "";
         setCompanyName(name);
         setCompanyNameInput(name);
+        if (data["app_logo"]) setAppLogo(data["app_logo"]);
       })
       .catch(() => toast.error("Erro ao carregar configurações"))
       .finally(() => setLoadingSettings(false));
@@ -100,6 +104,40 @@ export default function Configuracoes() {
       .then(setUsers)
       .catch(() => toast.error("Erro ao carregar usuários"))
       .finally(() => setLoadingUsers(false));
+  }
+
+  function handleLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 512 * 1024) {
+      toast.error("Imagem muito grande. Use até 512 KB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setAppLogoPreview(reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  async function saveAppLogo(logoData: string | null) {
+    setSavingLogo(true);
+    try {
+      const res = await apiFetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ app_logo: logoData ?? "" }),
+      });
+      if (!res.ok) throw new Error();
+      setAppLogo(logoData);
+      setAppLogoPreview(null);
+      const link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+      if (link) link.href = logoData ?? "/favicon.svg";
+      toast.success(logoData ? "Ícone atualizado!" : "Ícone removido.");
+    } catch {
+      toast.error("Erro ao salvar ícone");
+    } finally {
+      setSavingLogo(false);
+    }
   }
 
   async function saveCompanyName() {
@@ -242,11 +280,12 @@ export default function Configuracoes() {
         </TabsList>
 
         {/* ── General tab ── */}
-        <TabsContent value="geral" className="mt-4">
+        <TabsContent value="geral" className="mt-4 space-y-4">
+          {/* App name */}
           <Card className="rounded-xl max-w-lg">
             <CardHeader>
-              <CardTitle className="text-base">Nome da Empresa</CardTitle>
-              <CardDescription>Este nome aparece no topo do menu lateral</CardDescription>
+              <CardTitle className="text-base">Nome do Aplicativo</CardTitle>
+              <CardDescription>Exibido no topo do menu lateral e na tela de login</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {loadingSettings ? (
@@ -259,7 +298,7 @@ export default function Configuracoes() {
                       id="company-name"
                       value={companyNameInput}
                       onChange={(e) => setCompanyNameInput(e.target.value)}
-                      placeholder="Nome da empresa..."
+                      placeholder="Nome do aplicativo..."
                     />
                   </div>
                   <Button
@@ -268,6 +307,94 @@ export default function Configuracoes() {
                   >
                     {savingSettings ? "Salvando..." : "Salvar"}
                   </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* App logo / icon */}
+          <Card className="rounded-xl max-w-lg">
+            <CardHeader>
+              <CardTitle className="text-base">Ícone do Aplicativo</CardTitle>
+              <CardDescription>
+                Aparece no menu lateral, na tela de login e na aba do navegador. PNG ou SVG, até 512 KB.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {loadingSettings ? (
+                <Skeleton className="h-20 w-20 rounded-xl" />
+              ) : (
+                <>
+                  {/* Preview row */}
+                  <div className="flex items-center gap-4">
+                    {/* Current / preview icon */}
+                    <div className="relative">
+                      {(appLogoPreview ?? appLogo) ? (
+                        <img
+                          src={appLogoPreview ?? appLogo!}
+                          alt="Logo"
+                          className="h-16 w-16 object-contain rounded-xl border border-border"
+                        />
+                      ) : (
+                        <div className="h-16 w-16 rounded-xl border-2 border-dashed border-border flex items-center justify-center bg-muted/40">
+                          <ImagePlus className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      )}
+                      {appLogoPreview && (
+                        <span className="absolute -top-1.5 -right-1.5 text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-medium leading-none">
+                          novo
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="logo-upload"
+                        className="cursor-pointer inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                      >
+                        <ImagePlus className="h-4 w-4" />
+                        {appLogo ? "Trocar ícone" : "Carregar ícone"}
+                      </Label>
+                      <input
+                        id="logo-upload"
+                        type="file"
+                        accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={handleLogoFile}
+                      />
+                      {appLogo && !appLogoPreview && (
+                        <button
+                          onClick={() => saveAppLogo(null)}
+                          disabled={savingLogo}
+                          className="flex items-center gap-1.5 text-xs text-destructive hover:underline"
+                        >
+                          <X className="h-3 w-3" />
+                          Remover ícone
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Confirm / cancel when a new preview is pending */}
+                  {appLogoPreview && (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => saveAppLogo(appLogoPreview)}
+                        disabled={savingLogo}
+                      >
+                        {savingLogo ? "Salvando..." : "Confirmar ícone"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setAppLogoPreview(null)}
+                        disabled={savingLogo}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  )}
                 </>
               )}
             </CardContent>

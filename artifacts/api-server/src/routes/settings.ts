@@ -5,7 +5,7 @@ import { requireAuth, requireAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
 
-router.get("/settings", requireAuth, async (_req, res): Promise<void> => {
+router.get("/settings", async (_req, res): Promise<void> => {
   const rows = await db.select().from(appSettingsTable);
   const settings: Record<string, string> = {};
   for (const row of rows) {

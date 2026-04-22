@@ -40,6 +40,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [companyName, setCompanyName] = useState<string | null>(null);
+  const [appLogo, setAppLogo] = useState<string | null>(null);
 
   const { user, logout, hasPermission } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -49,6 +50,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       .then((r) => r.ok ? r.json() : null)
       .then((data: Record<string, string> | null) => {
         if (data?.["company_name"]) setCompanyName(data["company_name"]);
+        if (data?.["app_logo"]) {
+          setAppLogo(data["app_logo"]);
+          const link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+          if (link) link.href = data["app_logo"];
+        }
       })
       .catch(() => {});
   }, []);
@@ -57,7 +63,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const showSettings = user?.role === "admin";
   const allItems = showSettings ? [...visibleNavItems, SETTINGS_ITEM] : visibleNavItems;
 
-  const displayName = companyName ?? "Plataforma de Escala";
+  const displayName = companyName ?? "ProTeam";
 
   async function handleLogout() {
     try {
@@ -92,9 +98,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const MobileNavLinks = () => (
     <>
-      <div className="px-4 py-6">
-        <h2 className="text-xl font-bold tracking-tight text-primary">{displayName}</h2>
-        <p className="text-sm text-muted-foreground mt-1 font-mono">Control Room v1.0</p>
+      <div className="px-4 py-6 flex items-center gap-3">
+        {appLogo ? (
+          <img src={appLogo} alt={displayName} className="h-9 w-9 object-contain rounded-lg flex-shrink-0" />
+        ) : (
+          <div className="h-9 w-9 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <span className="text-xs font-black text-primary select-none">{displayName.slice(0, 2).toUpperCase()}</span>
+          </div>
+        )}
+        <div>
+          <h2 className="text-base font-bold tracking-tight text-primary leading-tight">{displayName}</h2>
+          <p className="text-xs text-muted-foreground font-mono leading-tight">Control Room v1.0</p>
+        </div>
       </div>
       <nav className="flex-1 space-y-1 px-2 overflow-y-auto">
         {allItems.map((item) => (
@@ -143,16 +158,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         }`}
       >
         {/* Logo */}
-        <div className={`px-4 py-6 overflow-hidden ${collapsed ? "px-2 flex justify-center" : ""}`}>
-          {collapsed ? (
-            <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center">
-              <LayoutDashboard className="h-4 w-4 text-primary" />
-            </div>
+        <div className={`py-5 overflow-hidden flex items-center ${collapsed ? "px-2 justify-center" : "px-4 gap-3"}`}>
+          {appLogo ? (
+            <img src={appLogo} alt={displayName} className={`object-contain rounded-lg flex-shrink-0 ${collapsed ? "h-8 w-8" : "h-9 w-9"}`} />
           ) : (
-            <>
-              <h2 className="text-xl font-bold tracking-tight text-primary whitespace-nowrap truncate">{displayName}</h2>
-              <p className="text-sm text-muted-foreground mt-1 font-mono">Control Room v1.0</p>
-            </>
+            <div className={`rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0 ${collapsed ? "h-8 w-8" : "h-9 w-9"}`}>
+              <span className="text-xs font-black text-primary select-none">{displayName.slice(0, 2).toUpperCase()}</span>
+            </div>
+          )}
+          {!collapsed && (
+            <div className="overflow-hidden">
+              <h2 className="text-base font-bold tracking-tight text-primary whitespace-nowrap truncate leading-tight">{displayName}</h2>
+              <p className="text-xs text-muted-foreground font-mono leading-tight">Control Room v1.0</p>
+            </div>
           )}
         </div>
 

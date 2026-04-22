@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [appName, setAppName] = useState("ProTeam");
+  const [appLogo, setAppLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/settings", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: Record<string, string> | null) => {
+        if (data?.["company_name"]) setAppName(data["company_name"]);
+        if (data?.["app_logo"]) setAppLogo(data["app_logo"]);
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,9 +41,24 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-sm px-4">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-primary">Plataforma de Escala</h1>
-          <p className="text-muted-foreground text-sm mt-1">Faça login para continuar</p>
+        <div className="text-center mb-8 flex flex-col items-center gap-3">
+          {appLogo ? (
+            <img
+              src={appLogo}
+              alt={appName}
+              className="h-16 w-16 object-contain rounded-xl"
+            />
+          ) : (
+            <div className="h-16 w-16 rounded-xl bg-primary/15 flex items-center justify-center">
+              <span className="text-2xl font-black text-primary select-none">
+                {appName.slice(0, 2).toUpperCase()}
+              </span>
+            </div>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-primary">{appName}</h1>
+            <p className="text-muted-foreground text-sm mt-1">Faça login para continuar</p>
+          </div>
         </div>
         <Card className="rounded-2xl shadow-lg">
           <CardHeader className="pb-4">
