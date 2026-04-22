@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, date, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { duosTable } from "./duos";
@@ -32,6 +32,20 @@ export const changeLogsTable = pgTable("change_logs", {
   newState: text("new_state"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const dayMemberOverridesTable = pgTable(
+  "day_member_overrides",
+  {
+    id: serial("id").primaryKey(),
+    date: date("date").notNull(),
+    duoId: integer("duo_id").notNull().references(() => duosTable.id, { onDelete: "cascade" }),
+    replacedMemberId: integer("replaced_member_id").notNull().references(() => membersTable.id, { onDelete: "cascade" }),
+    substituteMemberId: integer("substitute_member_id").notNull().references(() => membersTable.id, { onDelete: "cascade" }),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("day_member_overrides_unique").on(t.date, t.duoId, t.replacedMemberId)]
+);
 
 export const insertScheduleSchema = createInsertSchema(schedulesTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProducerWeekSchema = createInsertSchema(producerWeeksTable).omit({ id: true, createdAt: true, updatedAt: true });

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   useListSchedules,
   getListSchedulesQueryKey,
@@ -9,6 +9,8 @@ import {
   getListConflictsQueryKey,
   useListProducerWeeks,
   getListProducerWeeksQueryKey,
+  useListMembers,
+  getListMembersQueryKey,
 } from "@workspace/api-client-react";
 import {
   format,
@@ -35,7 +37,20 @@ import {
   DragEndEvent,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import { ChevronLeft, ChevronRight, AlertTriangle, AlertCircle, X, User, MessageSquare, StickyNote } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  AlertTriangle,
+  AlertCircle,
+  X,
+  User,
+  MessageSquare,
+  StickyNote,
+  ArrowLeftRight,
+  Trash2,
+  CheckCircle2,
+  UserCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,14 +58,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+
+type Member = { id: number; name: string; photoUrl?: string | null };
 
 type Duo = {
   id: number;
   name: string;
   color?: string | null;
-  members?: { id: number; name: string }[];
+  members?: Member[];
 };
 
 type DaySchedule = {
@@ -63,6 +88,18 @@ type DaySchedule = {
   sideDuo?: Duo | null;
   offDuo?: Duo | null;
   notes?: string | null;
+};
+
+type DayOverride = {
+  id: number;
+  date: string;
+  duoId: number;
+  duo: { id: number; name: string } | null;
+  replacedMemberId: number;
+  replacedMember: { id: number; name: string } | null;
+  substituteMemberId: number;
+  substituteMember: { id: number; name: string } | null;
+  reason: string | null;
 };
 
 type SlotId = `${string}:${"main" | "side" | "off"}`;
@@ -111,7 +148,6 @@ function detectLiveConflicts(
     }
   }
 
-  // workload imbalance
   if (sorted.length >= 5) {
     const work = new Map<number, number>();
     for (const s of sorted) {
@@ -168,11 +204,13 @@ function DroppableSlot({
   duo,
   label,
   onClear,
+  hasOverride,
 }: {
   slotId: string;
   duo?: Duo | null;
   label: string;
   onClear?: () => void;
+  hasOverride?: boolean;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: slotId });
 
@@ -187,6 +225,14 @@ function DroppableSlot({
         <div className="flex items-center gap-1 px-2 py-1 w-full">
           <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: duo.color || "#ccc" }} />
           <span className="text-[10px] font-medium truncate flex-1">{duo.name}</span>
+          {hasOverride && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <ArrowLeftRight className="h-2.5 w-2.5 text-amber-500 flex-shrink-0" />
+              </TooltipTrigger>
+              <TooltipContent className="text-xs">Substituição ativa</TooltipContent>
+            </Tooltip>
+          )}
           {onClear && (
             <button
               onClick={(e) => { e.stopPropagation(); onClear(); }}
@@ -211,6 +257,7 @@ function CalendarDay({
   onDropDuo,
   onClearSlot,
   onDayClick,
+  dayOverrides,
 }: {
   date: Date;
   schedule?: DaySchedule;
@@ -219,11 +266,16 @@ function CalendarDay({
   onDropDuo: (date: string, role: "main" | "side" | "off", duoId: number) => void;
   onClearSlot: (date: string, role: "main" | "side" | "off") => void;
   onDayClick: (date: string) => void;
+  dayOverrides: DayOverride[];
 }) {
   const dateStr = format(date, "yyyy-MM-dd");
   const today = isToday(date);
   const alertSeverity = dayAlerts.get(dateStr);
   const hasNote = !!(schedule?.notes?.trim());
+  const hasOverride = dayOverrides.length > 0;
+
+  const overridesForDuo = (duoId?: number | null) =>
+    duoId ? dayOverrides.filter((o) => o.duoId === duoId) : [];
 
   return (
     <div
@@ -242,6 +294,14 @@ function CalendarDay({
           {format(date, "d")}
         </span>
         <div className="flex items-center gap-0.5">
+          {hasOverride && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <ArrowLeftRight className="h-3 w-3 text-amber-500" />
+              </TooltipTrigger>
+              <TooltipContent className="text-xs">Substituição registrada</TooltipContent>
+            </Tooltip>
+          )}
           {hasNote && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -276,23 +336,25 @@ function CalendarDay({
             duo={schedule?.mainDuo}
             label="Principal"
             onClear={() => onClearSlot(dateStr, "main")}
+            hasOverride={overridesForDuo(schedule?.mainDuoId).length > 0}
           />
           <DroppableSlot
             slotId={`${dateStr}:side`}
             duo={schedule?.sideDuo}
             label="Lateral"
             onClear={() => onClearSlot(dateStr, "side")}
+            hasOverride={overridesForDuo(schedule?.sideDuoId).length > 0}
           />
           <DroppableSlot
             slotId={`${dateStr}:off`}
             duo={schedule?.offDuo}
             label="Folga"
             onClear={() => onClearSlot(dateStr, "off")}
+            hasOverride={overridesForDuo(schedule?.offDuoId).length > 0}
           />
         </div>
       )}
 
-      {/* Note preview strip */}
       {hasNote && (
         <div className="mt-1 px-1 py-0.5 rounded bg-primary/8 border border-primary/15 text-[10px] text-primary/70 leading-tight line-clamp-1">
           {schedule!.notes}
@@ -304,30 +366,95 @@ function CalendarDay({
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-type DayNotesDialogProps = {
+type SubstituteFormState = {
+  duoId: number;
+  duoName: string;
+  replacedMemberId: number;
+  replacedMemberName: string;
+  substituteMemberId: string;
+  reason: string;
+  existingOverrideId?: number;
+};
+
+type DayDialogProps = {
   selectedDay: string | null;
   schedule: DaySchedule | null | undefined;
   noteText: string;
   onNoteChange: (v: string) => void;
   onSave: () => void;
   onClose: () => void;
+  allMembers: Member[];
+  dayOverrides: DayOverride[];
+  onCreateOverride: (form: SubstituteFormState) => Promise<void>;
+  onDeleteOverride: (id: number) => Promise<void>;
 };
 
-function DayNotesDialog({ selectedDay, schedule, noteText, onNoteChange, onSave, onClose }: DayNotesDialogProps) {
+function DayDialog({
+  selectedDay,
+  schedule,
+  noteText,
+  onNoteChange,
+  onSave,
+  onClose,
+  allMembers,
+  dayOverrides,
+  onCreateOverride,
+  onDeleteOverride,
+}: DayDialogProps) {
+  const [subForm, setSubForm] = useState<SubstituteFormState | null>(null);
+  const [savingSub, setSavingSub] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
   if (!selectedDay) return null;
+
   const parsedDate = parseISO(selectedDay);
   const dayLabel = format(parsedDate, "EEEE, d 'de' MMMM", { locale: ptBR });
   const savedNote = schedule?.notes ?? "";
   const isDirty = noteText.trim() !== savedNote;
+
   const slots = [
     { label: "Principal", duo: schedule?.mainDuo },
-    { label: "Lateral",   duo: schedule?.sideDuo  },
-    { label: "Folga",     duo: schedule?.offDuo   },
+    { label: "Lateral", duo: schedule?.sideDuo },
+    { label: "Folga", duo: schedule?.offDuo },
   ];
 
+  function openSubForm(duo: Duo, member: Member, existingOverride?: DayOverride) {
+    setSubForm({
+      duoId: duo.id,
+      duoName: duo.name,
+      replacedMemberId: member.id,
+      replacedMemberName: member.name,
+      substituteMemberId: existingOverride ? String(existingOverride.substituteMemberId) : "",
+      reason: existingOverride?.reason ?? "",
+      existingOverrideId: existingOverride?.id,
+    });
+  }
+
+  async function handleSaveSub() {
+    if (!subForm || !subForm.substituteMemberId) return;
+    setSavingSub(true);
+    try {
+      await onCreateOverride({ ...subForm, substituteMemberId: subForm.substituteMemberId });
+      setSubForm(null);
+    } finally {
+      setSavingSub(false);
+    }
+  }
+
+  async function handleDeleteOverride(id: number) {
+    setDeletingId(id);
+    try {
+      await onDeleteOverride(id);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  const availableSubstitutes = allMembers.filter((m) => subForm && m.id !== subForm.replacedMemberId);
+
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-sm rounded-2xl">
+    <Dialog open onOpenChange={(open) => { if (!open) { setSubForm(null); onClose(); } }}>
+      <DialogContent className="max-w-md rounded-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 capitalize text-base">
             <MessageSquare className="h-4 w-4 text-primary" />
@@ -335,34 +462,152 @@ function DayNotesDialog({ selectedDay, schedule, noteText, onNoteChange, onSave,
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-1 text-sm">
-          {slots.map(({ label, duo }) => (
-            <div key={label} className="flex items-center gap-2">
-              <span className="text-muted-foreground w-16 text-xs">{label}</span>
-              {duo ? (
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: duo.color || "#ccc" }} />
-                  <span className="font-medium text-xs">{duo.name}</span>
+        <div className="space-y-3">
+          {slots.map(({ label, duo }) => {
+            if (!duo) {
+              return (
+                <div key={label} className="flex items-center gap-2">
+                  <span className="text-muted-foreground w-16 text-xs flex-shrink-0">{label}</span>
+                  <span className="text-xs text-muted-foreground italic">—</span>
                 </div>
-              ) : (
-                <span className="text-xs text-muted-foreground italic">—</span>
-              )}
-            </div>
-          ))}
+              );
+            }
+
+            const duoOverrides = dayOverrides.filter((o) => o.duoId === duo.id);
+            const members = duo.members ?? [];
+
+            return (
+              <div key={label} className="rounded-xl border p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: duo.color || "#ccc" }} />
+                  <span className="text-xs font-semibold text-foreground">{duo.name}</span>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">{label}</Badge>
+                </div>
+
+                <div className="space-y-1.5 pl-1">
+                  {members.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">Sem integrantes cadastrados</p>
+                  ) : (
+                    members.map((member) => {
+                      const override = duoOverrides.find((o) => o.replacedMemberId === member.id);
+                      return (
+                        <div key={member.id} className="flex items-center gap-2 group/member">
+                          {override ? (
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                              <UserCheck className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                              <span className="text-xs text-muted-foreground line-through truncate">{member.name}</span>
+                              <ArrowLeftRight className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                              <span className="text-xs font-medium text-amber-700 dark:text-amber-400 truncate">
+                                {override.substituteMember?.name ?? "?"}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                              <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                              <span className="text-xs truncate">{member.name}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover/member:opacity-100 transition-opacity">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 text-primary hover:text-primary hover:bg-primary/10"
+                              title={override ? "Editar substituição" : "Substituir integrante"}
+                              onClick={() => openSubForm(duo, member, override)}
+                            >
+                              <ArrowLeftRight className="h-3 w-3" />
+                            </Button>
+                            {override && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                title="Remover substituição"
+                                disabled={deletingId === override.id}
+                                onClick={() => handleDeleteOverride(override.id)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {subForm && subForm.duoId === duo.id && (
+                  <div className="mt-2 rounded-lg bg-muted/50 border p-3 space-y-2.5">
+                    <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <ArrowLeftRight className="h-3.5 w-3.5 text-primary" />
+                      Substituir <span className="font-semibold">{subForm.replacedMemberName}</span>
+                    </p>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Substituto *</Label>
+                      <Select
+                        value={subForm.substituteMemberId}
+                        onValueChange={(v) => setSubForm((f) => f ? { ...f, substituteMemberId: v } : f)}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Selecione um integrante..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableSubstitutes.map((m) => (
+                            <SelectItem key={m.id} value={String(m.id)} className="text-xs">
+                              {m.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Motivo (opcional)</Label>
+                      <input
+                        type="text"
+                        className="w-full h-8 text-xs rounded-md border border-input bg-background px-3 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        placeholder="Ex: Ausência por doença, compromisso pessoal..."
+                        value={subForm.reason}
+                        onChange={(e) => setSubForm((f) => f ? { ...f, reason: e.target.value } : f)}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={!subForm.substituteMemberId || savingSub}
+                        onClick={handleSaveSub}
+                      >
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        {savingSub ? "Salvando..." : "Confirmar"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs"
+                        onClick={() => setSubForm(null)}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div className="space-y-1.5 pt-1">
           <label className="text-sm font-medium flex items-center gap-1.5">
             <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
-            Observação
+            Observação do dia
           </label>
           <Textarea
             value={noteText}
             onChange={(e) => onNoteChange(e.target.value)}
             placeholder="Descreva ausências, situações adversas, trocas ou qualquer observação relevante para este dia..."
             className="resize-none text-sm rounded-xl"
-            rows={4}
-            autoFocus
+            rows={3}
+            autoFocus={false}
           />
           {noteText.trim() && (
             <p className="text-[11px] text-muted-foreground">
@@ -372,11 +617,9 @@ function DayNotesDialog({ selectedDay, schedule, noteText, onNoteChange, onSave,
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
-          {isDirty ? (
-            <Button size="sm" onClick={onSave}>Confirmar</Button>
-          ) : (
-            <Button size="sm" onClick={onClose}>Fechar</Button>
+          <Button variant="outline" size="sm" onClick={() => { setSubForm(null); onClose(); }}>Fechar</Button>
+          {isDirty && (
+            <Button size="sm" onClick={onSave}>Confirmar observação</Button>
           )}
         </DialogFooter>
       </DialogContent>
@@ -390,6 +633,8 @@ export default function Calendar() {
   const [localSchedules, setLocalSchedules] = useState<Record<string, DaySchedule>>({});
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [dayOverrides, setDayOverrides] = useState<DayOverride[]>([]);
+  const [loadingOverrides, setLoadingOverrides] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
@@ -401,6 +646,10 @@ export default function Calendar() {
 
   const { data: duos, isLoading: isLoadingDuos } = useListDuos(
     { query: { queryKey: getListDuosQueryKey() } }
+  );
+
+  const { data: allMembers } = useListMembers(
+    { query: { queryKey: getListMembersQueryKey() } }
   );
 
   const { data: conflicts } = useListConflicts(
@@ -417,6 +666,25 @@ export default function Calendar() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
+  async function fetchOverrides(y: number, m: number) {
+    setLoadingOverrides(true);
+    try {
+      const res = await fetch(`/api/day-overrides?year=${y}&month=${m}`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setDayOverrides(data);
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      setLoadingOverrides(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchOverrides(year, month);
+  }, [year, month]);
+
   const nextMonth = () => {
     setCurrentDate(addMonths(currentDate, 1));
     setLocalSchedules({});
@@ -430,21 +698,18 @@ export default function Calendar() {
   const monthEnd = endOfMonth(currentDate);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-  // Pad start
   const startPad = getDay(monthStart);
   const allDays = [...Array(startPad).fill(null), ...days];
 
   const scheduleMap = new Map<string, DaySchedule>();
   schedules?.forEach((s) => scheduleMap.set(s.date, s as DaySchedule));
 
-  // Build duoMap for live detection
   const duoMap = useMemo(() => {
     const m = new Map<number, string>();
     duos?.forEach((d) => m.set(d.id, d.name));
     return m;
   }, [duos]);
 
-  // Live conflicts computed from merged schedules (immediate feedback while dragging)
   const liveConflicts = useMemo(() => {
     const allDays = days.map((date) => {
       const dateStr = format(date, "yyyy-MM-dd");
@@ -455,7 +720,6 @@ export default function Calendar() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localSchedules, schedules, duoMap]);
 
-  // Map date -> highest severity for CalendarDay indicators
   const dayAlerts = useMemo(() => {
     const m = new Map<string, "error" | "warning">();
     for (const c of liveConflicts) {
@@ -464,6 +728,17 @@ export default function Calendar() {
     }
     return m;
   }, [liveConflicts]);
+
+  // Group overrides by date
+  const overridesByDate = useMemo(() => {
+    const m = new Map<string, DayOverride[]>();
+    for (const o of dayOverrides) {
+      const list = m.get(o.date) ?? [];
+      list.push(o);
+      m.set(o.date, list);
+    }
+    return m;
+  }, [dayOverrides]);
 
   function getMergedSchedule(dateStr: string): DaySchedule | undefined {
     const api = scheduleMap.get(dateStr);
@@ -480,6 +755,7 @@ export default function Calendar() {
       mainDuo: duoById(local.mainDuoId !== undefined ? local.mainDuoId : api?.mainDuoId),
       sideDuo: duoById(local.sideDuoId !== undefined ? local.sideDuoId : api?.sideDuoId),
       offDuo: duoById(local.offDuoId !== undefined ? local.offDuoId : api?.offDuoId),
+      notes: local.notes !== undefined ? local.notes : api?.notes,
     };
   }
 
@@ -587,6 +863,51 @@ export default function Calendar() {
     setLocalSchedules({});
   }
 
+  async function handleCreateOverride(form: SubstituteFormState) {
+    if (!selectedDay) return;
+    try {
+      const res = await fetch("/api/day-overrides", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: selectedDay,
+          duoId: form.duoId,
+          replacedMemberId: form.replacedMemberId,
+          substituteMemberId: Number(form.substituteMemberId),
+          reason: form.reason || null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const created: DayOverride = await res.json();
+      setDayOverrides((prev) => {
+        const others = prev.filter(
+          (o) => !(o.date === selectedDay && o.duoId === form.duoId && o.replacedMemberId === form.replacedMemberId)
+        );
+        return [...others, created];
+      });
+      toast.success("Substituição registrada!");
+    } catch {
+      toast.error("Erro ao registrar substituição");
+      throw new Error();
+    }
+  }
+
+  async function handleDeleteOverride(id: number) {
+    try {
+      const res = await fetch(`/api/day-overrides/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error();
+      setDayOverrides((prev) => prev.filter((o) => o.id !== id));
+      toast.success("Substituição removida!");
+    } catch {
+      toast.error("Erro ao remover substituição");
+      throw new Error();
+    }
+  }
+
   if (isLoadingSchedules || isLoadingDuos) {
     return (
       <div className="space-y-4">
@@ -599,6 +920,9 @@ export default function Calendar() {
       </div>
     );
   }
+
+  const selectedSchedule = selectedDay ? getMergedSchedule(selectedDay) : undefined;
+  const selectedDayOverrides = selectedDay ? (overridesByDate.get(selectedDay) ?? []) : [];
 
   return (
     <>
@@ -651,7 +975,6 @@ export default function Calendar() {
             <div className="space-y-1">
               {Array.from({ length: Math.ceil(allDays.length / 7) }, (_, weekIdx) => {
                 const weekDays = allDays.slice(weekIdx * 7, weekIdx * 7 + 7);
-                // Calendar rows start on Sunday; Seg (Monday) is index 1
                 const monday = weekDays[1] ?? weekDays.find((d) => d !== null) ?? null;
                 const weekMon = monday ? startOfWeek(monday, { weekStartsOn: 1 }) : null;
                 const weekMonStr = weekMon ? format(weekMon, "yyyy-MM-dd") : null;
@@ -693,6 +1016,7 @@ export default function Calendar() {
                             onDropDuo={handleDropDuo}
                             onClearSlot={handleClearSlot}
                             onDayClick={handleDayClick}
+                            dayOverrides={overridesByDate.get(dateStr) ?? []}
                           />
                         );
                       })}
@@ -775,14 +1099,20 @@ export default function Calendar() {
       </DragOverlay>
     </DndContext>
 
-    <DayNotesDialog
-      selectedDay={selectedDay}
-      schedule={selectedDay ? getMergedSchedule(selectedDay) : undefined}
-      noteText={noteText}
-      onNoteChange={setNoteText}
-      onSave={handleNoteSave}
-      onClose={() => setSelectedDay(null)}
-    />
+    {selectedDay && (
+      <DayDialog
+        selectedDay={selectedDay}
+        schedule={selectedSchedule}
+        noteText={noteText}
+        onNoteChange={setNoteText}
+        onSave={handleNoteSave}
+        onClose={() => setSelectedDay(null)}
+        allMembers={(allMembers as Member[]) ?? []}
+        dayOverrides={selectedDayOverrides}
+        onCreateOverride={handleCreateOverride}
+        onDeleteOverride={handleDeleteOverride}
+      />
+    )}
     </>
   );
 }

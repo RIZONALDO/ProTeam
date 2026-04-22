@@ -9,6 +9,7 @@ import dashboardRouter from "./dashboard";
 import authRouter from "./auth";
 import settingsRouter from "./settings";
 import usersAdminRouter from "./users-admin";
+import dayOverridesRouter from "./dayOverrides";
 
 const router: IRouter = Router();
 
@@ -21,6 +22,7 @@ router.use(membersRouter);
 router.use(duosRouter);
 router.use(producersRouter);
 router.use(schedulesRouter);
+router.use(dayOverridesRouter);
 router.use(dashboardRouter);
 
 export default router;
