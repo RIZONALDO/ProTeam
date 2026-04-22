@@ -12,6 +12,8 @@ export interface CreateMemberBody {
   /** @nullable */
   contact?: string | null;
   /** @nullable */
+  phone?: string | null;
+  /** @nullable */
   notes?: string | null;
   /** @nullable */
   photoUrl?: string | null;

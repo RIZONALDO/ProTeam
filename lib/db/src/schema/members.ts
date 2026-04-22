@@ -7,6 +7,7 @@ export const membersTable = pgTable("members", {
   name: text("name").notNull(),
   role: text("role").notNull(),
   contact: text("contact"),
+  phone: text("phone"),
   notes: text("notes"),
   photoUrl: text("photo_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

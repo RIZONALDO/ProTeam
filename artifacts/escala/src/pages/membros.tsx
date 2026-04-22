@@ -7,7 +7,7 @@ import {
   useDeleteMember,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit2, Trash2, User, Search, Camera, X } from "lucide-react";
+import { Plus, Edit2, Trash2, User, Search, Camera, X, Mail, Phone } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +46,7 @@ type MemberForm = {
   name: string;
   role: string;
   contact: string;
+  phone: string;
   notes: string;
   photoUrl: string | null;
 };
@@ -54,6 +55,7 @@ const defaultForm = (): MemberForm => ({
   name: "",
   role: "",
   contact: "",
+  phone: "",
   notes: "",
   photoUrl: null,
 });
@@ -131,6 +133,7 @@ export default function Membros() {
       name: m.name,
       role: m.role || "",
       contact: m.contact || "",
+      phone: m.phone || "",
       notes: m.notes || "",
       photoUrl: m.photoUrl ?? null,
     });
@@ -191,6 +194,7 @@ export default function Membros() {
             name: form.name,
             role: form.role || null,
             contact: form.contact || null,
+            phone: form.phone || null,
             notes: form.notes || null,
             photoUrl: form.photoUrl,
           },
@@ -202,6 +206,7 @@ export default function Membros() {
             name: form.name,
             role: form.role || null,
             contact: form.contact || null,
+            phone: form.phone || null,
             notes: form.notes || null,
             photoUrl: form.photoUrl,
           },
@@ -319,8 +324,21 @@ export default function Membros() {
                         </Button>
                       </div>
                     </div>
-                    {member.contact && (
-                      <p className="text-xs text-muted-foreground mt-2 truncate">{member.contact}</p>
+                    {(member.contact || member.phone) && (
+                      <div className="mt-2 space-y-0.5">
+                        {member.contact && (
+                          <p className="flex items-center gap-1.5 text-xs text-muted-foreground truncate">
+                            <Mail className="h-3 w-3 flex-shrink-0" />
+                            {member.contact}
+                          </p>
+                        )}
+                        {member.phone && (
+                          <p className="flex items-center gap-1.5 text-xs text-muted-foreground truncate">
+                            <Phone className="h-3 w-3 flex-shrink-0" />
+                            {member.phone}
+                          </p>
+                        )}
+                      </div>
                     )}
                     {member.notes && (
                       <p className="text-xs text-muted-foreground mt-1 italic truncate">{member.notes}</p>
@@ -408,12 +426,23 @@ export default function Membros() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="contact">Contato</Label>
+              <Label htmlFor="contact">E-mail</Label>
               <Input
                 id="contact"
+                type="email"
                 value={form.contact}
                 onChange={(e) => setForm({ ...form, contact: e.target.value })}
-                placeholder="E-mail ou telefone"
+                placeholder="nome@exemplo.com"
+              />
+            </div>
+            <div>
+              <Label htmlFor="phone">Telefone</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="(00) 00000-0000"
               />
             </div>
             <div>
