@@ -104,17 +104,25 @@ export default function Duplas() {
         });
         toast.success("Dupla criada!");
       }
-      queryClient.invalidateQueries({ queryKey: getListDuosQueryKey() });
+      invalidateAll();
       setDialogOpen(false);
     } catch {
       toast.error("Erro ao salvar dupla.");
     }
   }
 
+  function invalidateAll() {
+    queryClient.invalidateQueries({ queryKey: getListDuosQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListMembersQueryKey() });
+    queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/reports/duo-stats"] });
+  }
+
   async function handleDelete(id: number) {
     try {
       await deleteDuo.mutateAsync({ id });
-      queryClient.invalidateQueries({ queryKey: getListDuosQueryKey() });
+      invalidateAll();
       toast.success("Dupla removida.");
     } catch {
       toast.error("Erro ao remover dupla.");
