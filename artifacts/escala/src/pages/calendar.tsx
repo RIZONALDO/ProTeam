@@ -222,19 +222,21 @@ function DroppableSlot({
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: slotId });
 
+  const hasMembers = (duo?.members ?? []).length > 0;
+
   return (
     <div
       ref={setNodeRef}
-      className={`relative rounded transition-colors ${
+      className={`relative rounded transition-colors duration-200 ${
         isOver ? "bg-primary/10 ring-1 ring-primary" : "bg-muted/30"
-      } ${expanded && duo ? "py-1" : "min-h-[28px] flex items-center"}`}
+      }`}
     >
       {duo ? (
         <div className="w-full">
           {/* Duo header row */}
-          <div className="flex items-center gap-1 px-2 py-0.5">
+          <div className="flex items-center gap-1 px-2 min-h-[28px]">
             <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: duo.color || "#ccc" }} />
-            <span className="text-[10px] font-semibold truncate flex-1">{duo.name}</span>
+            <span className="text-[10px] font-semibold truncate flex-1 py-0.5">{duo.name}</span>
             {hasOverride && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -253,33 +255,43 @@ function DroppableSlot({
             )}
           </div>
 
-          {/* Expanded: member list */}
-          {expanded && (duo.members ?? []).length > 0 && (
-            <div className="px-2 pb-0.5 space-y-0.5">
-              {(duo.members ?? []).map((member) => {
-                const override = slotOverrides?.find((o) => o.replacedMemberId === member.id);
-                if (override) {
-                  return (
-                    <div key={member.id} className="flex items-center gap-0.5">
-                      <ArrowLeftRight className="h-2 w-2 text-amber-500 flex-shrink-0" />
-                      <span className="text-[9px] text-amber-700 dark:text-amber-400 font-medium truncate leading-tight">
-                        {override.substituteMember?.name ?? "?"}
-                      </span>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={member.id} className="flex items-center gap-0.5">
-                    <User className="h-2 w-2 text-muted-foreground flex-shrink-0" />
-                    <span className="text-[9px] text-muted-foreground truncate leading-tight">{member.name}</span>
-                  </div>
-                );
-              })}
+          {/* Member list — CSS grid trick for smooth height animation */}
+          {hasMembers && (
+            <div
+              className={`grid transition-all duration-300 ease-out ${
+                expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+              }`}
+            >
+              <div className="overflow-hidden">
+                <div className="px-2 pb-1 space-y-0.5 pt-0.5">
+                  {(duo.members ?? []).map((member) => {
+                    const override = slotOverrides?.find((o) => o.replacedMemberId === member.id);
+                    if (override) {
+                      return (
+                        <div key={member.id} className="flex items-center gap-0.5">
+                          <ArrowLeftRight className="h-2 w-2 text-amber-500 flex-shrink-0" />
+                          <span className="text-[9px] text-amber-700 dark:text-amber-400 font-medium truncate leading-tight">
+                            {override.substituteMember?.name ?? "?"}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={member.id} className="flex items-center gap-0.5">
+                        <User className="h-2 w-2 text-muted-foreground flex-shrink-0" />
+                        <span className="text-[9px] text-muted-foreground truncate leading-tight">{member.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
         </div>
       ) : (
-        <span className="text-[10px] text-muted-foreground px-2 italic">{label}</span>
+        <div className="min-h-[28px] flex items-center">
+          <span className="text-[10px] text-muted-foreground px-2 italic">{label}</span>
+        </div>
       )}
     </div>
   );
@@ -326,7 +338,7 @@ function CalendarDay({
 
   return (
     <div
-      className={`group relative flex flex-col p-1.5 border rounded-lg transition-all duration-150
+      className={`group relative flex flex-col p-1.5 border rounded-lg transition-[min-height,background-color,border-color,box-shadow] duration-300 ease-out
         ${effectiveExpanded ? "min-h-[155px]" : "min-h-[110px]"}
         ${!isCurrentMonth ? "opacity-30 bg-muted/20 pointer-events-none" : "bg-card hover:bg-muted/10 cursor-pointer"}
         ${today ? "ring-2 ring-primary" : ""}
@@ -338,7 +350,7 @@ function CalendarDay({
       <div
         className={`flex items-center justify-between rounded px-0.5 -mx-0.5 mb-1 pb-1
           border-b border-border/40 group-hover:border-primary/30
-          group-hover:bg-primary/5 transition-all duration-150 cursor-pointer`}
+          group-hover:bg-primary/5 transition-all duration-200 ease-out cursor-pointer`}
         title="Clique para ver detalhes do dia"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -1100,7 +1112,7 @@ export default function Calendar() {
                     )}
                     <div className="grid grid-cols-7 gap-1">
                       {weekDays.map((date, idx) => {
-                        if (!date) return <div key={`pad-${weekIdx}-${idx}`} className={expanded ? "min-h-[155px]" : "min-h-[110px]"} />;
+                        if (!date) return <div key={`pad-${weekIdx}-${idx}`} className={`transition-[min-height] duration-300 ease-out ${expanded ? "min-h-[155px]" : "min-h-[110px]"}`} />;
                         const dateStr = format(date, "yyyy-MM-dd");
                         const schedule = getMergedSchedule(dateStr);
                         return (

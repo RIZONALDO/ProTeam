@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useListSchedules,
   getListSchedulesQueryKey,
@@ -11,6 +11,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import {
   format,
+  addDays,
   addWeeks,
   subWeeks,
   startOfWeek,
@@ -20,7 +21,18 @@ import {
   isToday,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, User, Pencil, Check, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  User,
+  Pencil,
+  Check,
+  X,
+  Bell,
+  ArrowLeftRight,
+  CalendarCheck,
+  CalendarX,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,15 +55,138 @@ type DuoInfo = {
   members?: DuoMember[];
 };
 
+type DayOverride = {
+  id: number;
+  date: string;
+  duoId: number;
+  duo: { id: number; name: string } | null;
+  replacedMemberId: number;
+  replacedMember: { id: number; name: string } | null;
+  substituteMemberId: number;
+  substituteMember: { id: number; name: string } | null;
+  reason: string | null;
+};
+
+type ScheduleEntry = {
+  date: string;
+  mainDuo?: DuoInfo | null;
+  sideDuo?: DuoInfo | null;
+  offDuo?: DuoInfo | null;
+};
+
 function photoSrc(objectPath: string | null | undefined) {
   if (!objectPath) return null;
   return `/api/storage${objectPath}`;
+}
+
+function MuralDayCard({
+  label,
+  date,
+  schedule,
+  overrides,
+  accent,
+}: {
+  label: string;
+  date: Date;
+  schedule?: ScheduleEntry | null;
+  overrides: DayOverride[];
+  accent?: boolean;
+}) {
+  const hasSchedule = !!(schedule?.mainDuo || schedule?.sideDuo || schedule?.offDuo);
+  const hasOverrides = overrides.length > 0;
+
+  return (
+    <div
+      className={`flex-1 min-w-0 rounded-xl border p-3 space-y-2 transition-colors ${
+        accent
+          ? "border-primary/40 bg-primary/5"
+          : "border-border bg-muted/20"
+      }`}
+    >
+      {/* header */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          {hasOverrides
+            ? <ArrowLeftRight className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+            : <CalendarCheck className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+          }
+          <span className={`text-xs font-semibold ${accent ? "text-primary" : "text-foreground"}`}>
+            {label}
+          </span>
+        </div>
+        <span className="text-[10px] text-muted-foreground capitalize flex-shrink-0">
+          {format(date, "EEE, d MMM", { locale: ptBR })}
+        </span>
+      </div>
+
+      {/* schedule */}
+      {hasSchedule ? (
+        <div className="space-y-0.5">
+          {schedule?.mainDuo && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: schedule.mainDuo.color || "#ccc" }} />
+              <span className="text-[10px] font-medium truncate">{schedule.mainDuo.name}</span>
+              <span className="text-[9px] text-muted-foreground ml-auto flex-shrink-0">principal</span>
+            </div>
+          )}
+          {schedule?.sideDuo && (
+            <div className="flex items-center gap-1.5 opacity-80">
+              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: schedule.sideDuo.color || "#ccc" }} />
+              <span className="text-[10px] truncate">{schedule.sideDuo.name}</span>
+              <span className="text-[9px] text-muted-foreground ml-auto flex-shrink-0">lateral</span>
+            </div>
+          )}
+          {schedule?.offDuo && (
+            <div className="flex items-center gap-1.5 opacity-50">
+              <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground flex-shrink-0" />
+              <span className="text-[10px] line-through truncate">{schedule.offDuo.name}</span>
+              <span className="text-[9px] text-muted-foreground ml-auto flex-shrink-0">folga</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground italic">
+          <CalendarX className="h-3 w-3 flex-shrink-0" />
+          Sem escala definida
+        </div>
+      )}
+
+      {/* substitutions */}
+      {hasOverrides && (
+        <div className="border-t border-amber-200 dark:border-amber-800/40 pt-2 space-y-1.5">
+          <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1">
+            <ArrowLeftRight className="h-3 w-3" />
+            {overrides.length === 1 ? "1 substituição" : `${overrides.length} substituições`}
+          </p>
+          {overrides.map((o) => (
+            <div key={o.id} className="space-y-0.5">
+              <div className="flex items-center gap-1 text-[10px] flex-wrap">
+                <span className="text-muted-foreground">{o.replacedMember?.name ?? "?"}</span>
+                <ArrowLeftRight className="h-2.5 w-2.5 text-amber-500 flex-shrink-0" />
+                <span className="font-medium text-amber-700 dark:text-amber-400">{o.substituteMember?.name ?? "?"}</span>
+              </div>
+              {o.duo && <p className="text-[9px] text-muted-foreground pl-1">Dupla: {o.duo.name}</p>}
+              {o.reason && <p className="text-[9px] text-muted-foreground/70 italic pl-1 line-clamp-1">"{o.reason}"</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function EscalaSemanal() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [editingProducer, setEditingProducer] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string>("");
+  const [todayOverrides, setTodayOverrides] = useState<DayOverride[]>([]);
+  const [tomorrowOverrides, setTomorrowOverrides] = useState<DayOverride[]>([]);
+  const [loadingOverrides, setLoadingOverrides] = useState(false);
+
+  const today = new Date();
+  const tomorrow = addDays(today, 1);
+  const todayStr = format(today, "yyyy-MM-dd");
+  const tomorrowStr = format(tomorrow, "yyyy-MM-dd");
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -65,10 +200,61 @@ export default function EscalaSemanal() {
     { query: { queryKey: getListSchedulesQueryKey({ year, month }) } }
   );
 
+  // Always fetch today's month schedules too, if different
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth() + 1;
+  const needsTodayFetch = todayYear !== year || todayMonth !== month;
+  const { data: todayMonthSchedules } = useListSchedules(
+    { year: todayYear, month: todayMonth },
+    { query: { queryKey: getListSchedulesQueryKey({ year: todayYear, month: todayMonth }), enabled: needsTodayFetch } }
+  );
+  const tomorrowYear = tomorrow.getFullYear();
+  const tomorrowMonth = tomorrow.getMonth() + 1;
+  const needsTomorrowFetch = tomorrowYear !== todayYear || tomorrowMonth !== todayMonth;
+  const { data: tomorrowMonthSchedules } = useListSchedules(
+    { year: tomorrowYear, month: tomorrowMonth },
+    { query: { queryKey: getListSchedulesQueryKey({ year: tomorrowYear, month: tomorrowMonth }), enabled: needsTomorrowFetch } }
+  );
+
   const { data: producerWeeks } = useListProducerWeeks({ query: { queryKey: getListProducerWeeksQueryKey() } });
   const { data: members } = useListMembers({ query: { queryKey: getListMembersQueryKey() } });
   const createProducerWeek = useCreateProducerWeek();
   const queryClient = useQueryClient();
+
+  // Fetch overrides
+  useEffect(() => {
+    async function fetchOverrides() {
+      setLoadingOverrides(true);
+      try {
+        const months = new Set([
+          `${todayYear}-${todayMonth}`,
+          `${tomorrowYear}-${tomorrowMonth}`,
+        ]);
+        const all: DayOverride[] = [];
+        for (const key of months) {
+          const [y, m] = key.split("-").map(Number);
+          const res = await fetch(`/api/day-overrides?year=${y}&month=${m}`, { credentials: "include" });
+          if (res.ok) all.push(...(await res.json() as DayOverride[]));
+        }
+        setTodayOverrides(all.filter((o) => o.date === todayStr));
+        setTomorrowOverrides(all.filter((o) => o.date === tomorrowStr));
+      } finally {
+        setLoadingOverrides(false);
+      }
+    }
+    fetchOverrides();
+  }, [todayStr, tomorrowStr]);
+
+  // Resolve today/tomorrow schedules
+  const allSchedules = [
+    ...(schedules ?? []),
+    ...(needsTodayFetch ? (todayMonthSchedules ?? []) : []),
+    ...(needsTomorrowFetch ? (tomorrowMonthSchedules ?? []) : []),
+  ];
+  const scheduleMapAll = new Map<string, ScheduleEntry>();
+  allSchedules.forEach((s) => scheduleMapAll.set(s.date, s as ScheduleEntry));
+  const todaySchedule = scheduleMapAll.get(todayStr) ?? null;
+  const tomorrowSchedule = scheduleMapAll.get(tomorrowStr) ?? null;
 
   const producers = members?.filter((m) => m.role === "Produtor") ?? [];
 
@@ -91,9 +277,7 @@ export default function EscalaSemanal() {
   async function saveProducer() {
     const memberId = selectedMemberId ? parseInt(selectedMemberId) : null;
     try {
-      await createProducerWeek.mutateAsync({
-        data: { weekStart: weekStartStr, memberId },
-      });
+      await createProducerWeek.mutateAsync({ data: { weekStart: weekStartStr, memberId } });
       queryClient.invalidateQueries({ queryKey: getListProducerWeeksQueryKey() });
       toast.success("Produtor da semana atualizado!");
     } catch {
@@ -117,13 +301,7 @@ export default function EscalaSemanal() {
 
   function DuoChip({ duo, variant }: { duo?: DuoInfo | null; variant: "main" | "side" | "off" }) {
     if (!duo) return <span className="text-xs text-muted-foreground italic">-</span>;
-
-    const variantStyles = {
-      main: "font-bold",
-      side: "opacity-80",
-      off: "opacity-50 line-through",
-    };
-
+    const variantStyles = { main: "font-bold", side: "opacity-80", off: "opacity-50 line-through" };
     return (
       <div className={`space-y-1 ${variantStyles[variant]}`}>
         <div className="flex items-center gap-1.5">
@@ -155,6 +333,8 @@ export default function EscalaSemanal() {
     );
   }
 
+  const totalOverrides = todayOverrides.length + tomorrowOverrides.length;
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -181,11 +361,8 @@ export default function EscalaSemanal() {
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               {currentProducer?.photoUrl ? (
-                <img
-                  src={photoSrc(currentProducer.photoUrl)!}
-                  alt={currentProducer.name}
-                  className="h-14 w-14 rounded-full object-cover border-2 border-primary/30 flex-shrink-0"
-                />
+                <img src={photoSrc(currentProducer.photoUrl)!} alt={currentProducer.name}
+                  className="h-14 w-14 rounded-full object-cover border-2 border-primary/30 flex-shrink-0" />
               ) : (
                 <div className="h-14 w-14 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 border-2 border-primary/30">
                   <User className="h-7 w-7 text-primary" />
@@ -202,9 +379,7 @@ export default function EscalaSemanal() {
                       <SelectContent>
                         <SelectItem value="none">— Nenhum —</SelectItem>
                         {producers.map((p) => (
-                          <SelectItem key={p.id} value={p.id.toString()}>
-                            {p.name}
-                          </SelectItem>
+                          <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -232,27 +407,25 @@ export default function EscalaSemanal() {
         </CardContent>
       </Card>
 
+      {/* Weekly day cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
         {days.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
           const schedule = scheduleMap.get(dateStr);
-          const today = isToday(day);
+          const todayFlag = isToday(day);
 
           return (
-            <Card
-              key={dateStr}
-              className={`rounded-xl ${today ? "ring-2 ring-primary shadow-md" : "shadow-sm"}`}
-            >
+            <Card key={dateStr} className={`rounded-xl ${todayFlag ? "ring-2 ring-primary shadow-md" : "shadow-sm"}`}>
               <div className="pb-2 pt-4 px-4">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-muted-foreground uppercase">
                     {format(day, "EEE", { locale: ptBR })}
                   </span>
-                  {today && (
+                  {todayFlag && (
                     <Badge className="text-[10px] px-1.5 py-0.5 bg-primary text-primary-foreground">Hoje</Badge>
                   )}
                 </div>
-                <span className={`text-2xl font-bold ${today ? "text-primary" : ""}`}>
+                <span className={`text-2xl font-bold ${todayFlag ? "text-primary" : ""}`}>
                   {format(day, "d")}
                 </span>
               </div>
@@ -281,6 +454,44 @@ export default function EscalaSemanal() {
             </Card>
           );
         })}
+      </div>
+
+      {/* ── Mural de Avisos (rodapé) ── */}
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/30">
+          <Bell className="h-4 w-4 text-amber-500" />
+          <span className="text-sm font-semibold">Mural de Avisos</span>
+          <span className="text-xs text-muted-foreground">— hoje e amanhã</span>
+          {totalOverrides > 0 && (
+            <Badge className="ml-auto text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0 shadow-none">
+              {totalOverrides} troca{totalOverrides !== 1 ? "s" : ""}
+            </Badge>
+          )}
+        </div>
+        <div className="p-4">
+          {loadingOverrides ? (
+            <div className="flex gap-4">
+              <Skeleton className="h-24 flex-1 rounded-xl" />
+              <Skeleton className="h-24 flex-1 rounded-xl" />
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-3">
+              <MuralDayCard
+                label="Hoje"
+                date={today}
+                schedule={todaySchedule}
+                overrides={todayOverrides}
+                accent
+              />
+              <MuralDayCard
+                label="Amanhã"
+                date={tomorrow}
+                schedule={tomorrowSchedule}
+                overrides={tomorrowOverrides}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
