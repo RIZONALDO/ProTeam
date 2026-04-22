@@ -101,60 +101,39 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           )}
         </div>
 
-        {/* Nav items */}
-        <nav className="flex-1 space-y-1 px-2 overflow-y-auto overflow-x-hidden">
-          {NAV_ITEMS.map((item) => {
-            const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
-            const Icon = item.icon;
-            return (
-              <Link key={item.href} href={item.href}>
-                <div
-                  title={collapsed ? item.label : undefined}
-                  className={`flex items-center py-2.5 text-sm font-medium rounded-xl cursor-pointer transition-colors ${
-                    collapsed ? "justify-center px-2" : "px-3"
-                  } ${
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  }`}
-                >
-                  <Icon className={`h-5 w-5 flex-shrink-0 ${collapsed ? "" : "mr-3"} ${isActive ? "text-primary-foreground" : "text-sidebar-foreground"}`} />
-                  {!collapsed && <span className="truncate">{item.label}</span>}
-                </div>
-              </Link>
-            );
-          })}
-        </nav>
+        {/* Nav items + Collapse button */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
+          <nav className="space-y-1 px-2">
+            {NAV_ITEMS.map((item) => {
+              const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
+              const Icon = item.icon;
+              return (
+                <Link key={item.href} href={item.href}>
+                  <div
+                    title={collapsed ? item.label : undefined}
+                    className={`flex items-center py-2.5 text-sm font-medium rounded-xl cursor-pointer transition-colors ${
+                      collapsed ? "justify-center px-2" : "px-3"
+                    } ${
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    }`}
+                  >
+                    <Icon className={`h-5 w-5 flex-shrink-0 ${collapsed ? "" : "mr-3"} ${isActive ? "text-primary-foreground" : "text-sidebar-foreground"}`} />
+                    {!collapsed && <span className="truncate">{item.label}</span>}
+                  </div>
+                </Link>
+              );
+            })}
+          </nav>
 
-        {/* User + Collapse button */}
-        <div className="mt-auto">
-          {/* User info */}
-          {!collapsed && (
-            <div className="px-4 py-3 flex items-center">
-              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                <UserCircle className="h-5 w-5 text-primary" />
-              </div>
-              <div className="ml-3 overflow-hidden">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">Admin User</p>
-                <p className="text-xs text-muted-foreground font-mono truncate">admin@escala</p>
-              </div>
-            </div>
-          )}
-          {collapsed && (
-            <div className="flex justify-center py-3">
-              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
-                <UserCircle className="h-5 w-5 text-primary" />
-              </div>
-            </div>
-          )}
-
-          {/* Divider + Collapse button */}
-          <div className="border-t border-sidebar-border">
+          {/* Collapse button — right below nav items */}
+          <div className="px-2 pt-1">
             <button
               onClick={() => setCollapsed((v) => !v)}
               title={collapsed ? "Expandir menu" : "Recolher menu"}
-              className={`w-full flex items-center py-3 text-sm text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors ${
-                collapsed ? "justify-center px-2" : "px-4 gap-2"
+              className={`w-full flex items-center py-2.5 rounded-xl text-sm text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors ${
+                collapsed ? "justify-center px-2" : "px-3 gap-2"
               }`}
             >
               {collapsed ? (
@@ -167,6 +146,27 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               )}
             </button>
           </div>
+        </div>
+
+        {/* User info at the bottom */}
+        <div className="border-t border-sidebar-border">
+          {!collapsed ? (
+            <div className="px-4 py-3 flex items-center">
+              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <UserCircle className="h-5 w-5 text-primary" />
+              </div>
+              <div className="ml-3 overflow-hidden">
+                <p className="text-sm font-medium text-sidebar-foreground truncate">Admin User</p>
+                <p className="text-xs text-muted-foreground font-mono truncate">admin@escala</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-center py-3">
+              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
+                <UserCircle className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
