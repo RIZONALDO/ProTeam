@@ -22,8 +22,8 @@ A full-stack internal scheduling platform for a video content production team. B
 - **Escala Mensal** — Monthly read-only view with statistics sidebar
 - **Duplas** — CRUD for team pairs (color-coded, member selection)
 - **Membros** — CRUD for individual team members with roles/contacts/photo upload
-- **Produtores** — CRUD for producers + week assignment
 - **Relatórios** — Statistics tabs: duo stats, producer stats, change history
+- **Configurações** — Company name settings + user management with per-menu permissions
 
 ## Tech Stack
 
@@ -31,6 +31,15 @@ A full-stack internal scheduling platform for a video content production team. B
 - Backend: Express, Fastify-style typed routes, Pino logging, Zod validation
 - DB: PostgreSQL via Drizzle ORM
 - Codegen: Orval (OpenAPI → React Query hooks + Zod schemas)
+
+## Authentication
+
+- Session-based auth via `express-session` with `SESSION_SECRET` env var
+- Passwords hashed with `crypto.scryptSync`
+- Default admin: username `admin`, password `admin123` (change in Configurações)
+- Roles: `admin` (full access) | `user` (menu items restricted by `permissions` field)
+- Permissions stored as comma-separated route paths, e.g. `/,/calendar,/escala-semanal`
+- Frontend: `AuthProvider` context → login wall → `useAuth()` for permission checks
 
 ## Database Schema
 

@@ -3,7 +3,9 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import NotFound from "@/pages/not-found";
+import LoginPage from "@/pages/login";
 
 import Dashboard from "@/pages/dashboard";
 import Calendar from "@/pages/calendar";
@@ -12,6 +14,7 @@ import EscalaMensal from "@/pages/escala-mensal";
 import Duplas from "@/pages/duplas";
 import Membros from "@/pages/membros";
 import Relatorios from "@/pages/relatorios";
+import Configuracoes from "@/pages/configuracoes";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,6 +26,20 @@ const queryClient = new QueryClient({
 });
 
 function Router() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-muted-foreground text-sm">Carregando...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
   return (
     <AppLayout>
       <Switch>
@@ -34,6 +51,7 @@ function Router() {
         <Route path="/duplas" component={Duplas} />
         <Route path="/membros" component={Membros} />
         <Route path="/relatorios" component={Relatorios} />
+        <Route path="/configuracoes" component={Configuracoes} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
@@ -45,7 +63,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <AuthProvider>
+            <Router />
+          </AuthProvider>
         </WouterRouter>
         <Toaster richColors />
       </TooltipProvider>

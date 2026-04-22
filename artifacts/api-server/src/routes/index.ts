@@ -6,11 +6,17 @@ import duosRouter from "./duos";
 import producersRouter from "./producers";
 import schedulesRouter from "./schedules";
 import dashboardRouter from "./dashboard";
+import authRouter from "./auth";
+import settingsRouter from "./settings";
+import usersAdminRouter from "./users-admin";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(storageRouter);
+router.use(authRouter);
+router.use(settingsRouter);
+router.use(usersAdminRouter);
 router.use(membersRouter);
 router.use(duosRouter);
 router.use(producersRouter);
