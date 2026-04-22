@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useUpload } from "@workspace/object-storage-web";
+import { CropImageDialog } from "@/components/CropImageDialog";
 
 type MemberForm = {
   name: string;
@@ -93,6 +94,8 @@ export default function Membros() {
   const [form, setForm] = useState<MemberForm>(defaultForm());
   const [search, setSearch] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
@@ -128,14 +131,26 @@ export default function Membros() {
     setDialogOpen(true);
   }
 
-  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPendingFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setCropSrc(reader.result as string);
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
-    const localPreview = URL.createObjectURL(file);
+  async function handleCropConfirm(croppedBlob: Blob) {
+    setCropSrc(null);
+    const fileName = pendingFile?.name ?? "photo.jpg";
+    const croppedFile = new File([croppedBlob], fileName, { type: "image/jpeg" });
+    setPendingFile(null);
+
+    const localPreview = URL.createObjectURL(croppedBlob);
     setPhotoPreview(localPreview);
 
-    const result = await uploadFile(file);
+    const result = await uploadFile(croppedFile);
     if (result) {
       setForm((prev) => ({ ...prev, photoUrl: result.objectPath }));
       toast.success("Foto carregada com sucesso!");
@@ -143,6 +158,11 @@ export default function Membros() {
       toast.error("Erro ao fazer upload da foto.");
       setPhotoPreview(form.photoUrl ? photoSrc(form.photoUrl) : null);
     }
+  }
+
+  function handleCropCancel() {
+    setCropSrc(null);
+    setPendingFile(null);
   }
 
   function handleRemovePhoto() {
@@ -423,6 +443,15 @@ export default function Membros() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {cropSrc && (
+        <CropImageDialog
+          open={!!cropSrc}
+          imageSrc={cropSrc}
+          onConfirm={handleCropConfirm}
+          onCancel={handleCropCancel}
+        />
+      )}
     </div>
   );
 }
