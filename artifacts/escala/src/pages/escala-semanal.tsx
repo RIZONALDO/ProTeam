@@ -34,11 +34,13 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 
+type DuoMember = { id: number; name: string; role?: string | null; photoUrl?: string | null };
+
 type DuoInfo = {
   id: number;
   name: string;
   color?: string | null;
-  members?: { id: number; name: string; role?: string | null }[];
+  members?: DuoMember[];
 };
 
 function photoSrc(objectPath: string | null | undefined) {
@@ -100,6 +102,19 @@ export default function EscalaSemanal() {
     setEditingProducer(false);
   }
 
+  function MemberAvatar({ member, size = "sm" }: { member: DuoMember; size?: "sm" | "xs" }) {
+    const dim = size === "sm" ? "h-6 w-6 text-[9px]" : "h-5 w-5 text-[8px]";
+    const src = photoSrc(member.photoUrl);
+    const initials = member.name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
+    return src ? (
+      <img src={src} alt={member.name} className={`${dim} rounded-full object-cover border border-border flex-shrink-0`} title={member.name} />
+    ) : (
+      <div className={`${dim} rounded-full bg-muted flex items-center justify-center font-semibold text-muted-foreground flex-shrink-0 border border-border`} title={member.name}>
+        {initials}
+      </div>
+    );
+  }
+
   function DuoChip({ duo, variant }: { duo?: DuoInfo | null; variant: "main" | "side" | "off" }) {
     if (!duo) return <span className="text-xs text-muted-foreground italic">-</span>;
 
@@ -110,9 +125,21 @@ export default function EscalaSemanal() {
     };
 
     return (
-      <div className={`flex items-center gap-1.5 ${variantStyles[variant]}`}>
-        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: duo.color || "#ccc" }} />
-        <span className="text-sm">{duo.name}</span>
+      <div className={`space-y-1 ${variantStyles[variant]}`}>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: duo.color || "#ccc" }} />
+          <span className="text-sm">{duo.name}</span>
+        </div>
+        {variant !== "off" && duo.members && duo.members.length > 0 && (
+          <div className="flex items-center gap-1 ml-3.5">
+            {duo.members.map((m) => (
+              <div key={m.id} className="flex items-center gap-1">
+                <MemberAvatar member={m} size="sm" />
+                <span className="text-[10px] text-muted-foreground leading-none">{m.name.split(" ")[0]}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -235,16 +262,10 @@ export default function EscalaSemanal() {
                     <div>
                       <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Principal</p>
                       <DuoChip duo={schedule.mainDuo as DuoInfo} variant="main" />
-                      {(schedule.mainDuo as DuoInfo)?.members?.map((m) => (
-                        <p key={m.id} className="text-[10px] text-muted-foreground ml-3.5 mt-0.5">{m.name}</p>
-                      ))}
                     </div>
                     <div className="border-t pt-2">
                       <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Lateral</p>
                       <DuoChip duo={schedule.sideDuo as DuoInfo} variant="side" />
-                      {(schedule.sideDuo as DuoInfo)?.members?.map((m) => (
-                        <p key={m.id} className="text-[10px] text-muted-foreground ml-3.5 mt-0.5">{m.name}</p>
-                      ))}
                     </div>
                     <div className="border-t pt-2">
                       <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Folga</p>
