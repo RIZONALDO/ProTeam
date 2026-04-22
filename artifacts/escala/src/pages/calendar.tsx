@@ -35,12 +35,14 @@ import {
   DragEndEvent,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import { ChevronLeft, ChevronRight, AlertTriangle, AlertCircle, X, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, AlertCircle, X, User, MessageSquare, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -60,6 +62,7 @@ type DaySchedule = {
   mainDuo?: Duo | null;
   sideDuo?: Duo | null;
   offDuo?: Duo | null;
+  notes?: string | null;
 };
 
 type SlotId = `${string}:${"main" | "side" | "off"}`;
@@ -207,6 +210,7 @@ function CalendarDay({
   dayAlerts,
   onDropDuo,
   onClearSlot,
+  onDayClick,
 }: {
   date: Date;
   schedule?: DaySchedule;
@@ -214,18 +218,21 @@ function CalendarDay({
   dayAlerts: Map<string, "error" | "warning">;
   onDropDuo: (date: string, role: "main" | "side" | "off", duoId: number) => void;
   onClearSlot: (date: string, role: "main" | "side" | "off") => void;
+  onDayClick: (date: string) => void;
 }) {
   const dateStr = format(date, "yyyy-MM-dd");
   const today = isToday(date);
   const alertSeverity = dayAlerts.get(dateStr);
+  const hasNote = !!(schedule?.notes?.trim());
 
   return (
     <div
       className={`group relative flex flex-col p-1.5 border rounded-lg min-h-[110px] transition-colors
-        ${!isCurrentMonth ? "opacity-30 bg-muted/20" : "bg-card hover:bg-muted/10"}
+        ${!isCurrentMonth ? "opacity-30 bg-muted/20 pointer-events-none" : "bg-card hover:bg-muted/10 cursor-pointer"}
         ${today ? "ring-2 ring-primary" : ""}
         ${alertSeverity === "error" ? "border-destructive/60" : alertSeverity === "warning" ? "border-amber-400/60" : "border-border"}
       `}
+      onClick={() => isCurrentMonth && onDayClick(dateStr)}
     >
       <div className="flex items-center justify-between mb-1">
         <span
@@ -234,26 +241,36 @@ function CalendarDay({
         >
           {format(date, "d")}
         </span>
-        {alertSeverity === "error" && (
-          <Tooltip>
-            <TooltipTrigger>
-              <AlertCircle className="h-3 w-3 text-destructive" />
-            </TooltipTrigger>
-            <TooltipContent>Erro de regra neste dia</TooltipContent>
-          </Tooltip>
-        )}
-        {alertSeverity === "warning" && (
-          <Tooltip>
-            <TooltipTrigger>
-              <AlertTriangle className="h-3 w-3 text-amber-500" />
-            </TooltipTrigger>
-            <TooltipContent>Aviso neste dia</TooltipContent>
-          </Tooltip>
-        )}
+        <div className="flex items-center gap-0.5">
+          {hasNote && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <StickyNote className="h-3 w-3 text-primary/60" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-[180px] text-xs">{schedule!.notes}</TooltipContent>
+            </Tooltip>
+          )}
+          {alertSeverity === "error" && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <AlertCircle className="h-3 w-3 text-destructive" />
+              </TooltipTrigger>
+              <TooltipContent>Erro de regra neste dia</TooltipContent>
+            </Tooltip>
+          )}
+          {alertSeverity === "warning" && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <AlertTriangle className="h-3 w-3 text-amber-500" />
+              </TooltipTrigger>
+              <TooltipContent>Aviso neste dia</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       </div>
 
       {isCurrentMonth && (
-        <div className="flex flex-col gap-0.5 flex-1">
+        <div className="flex flex-col gap-0.5 flex-1" onClick={(e) => e.stopPropagation()}>
           <DroppableSlot
             slotId={`${dateStr}:main`}
             duo={schedule?.mainDuo}
@@ -274,16 +291,105 @@ function CalendarDay({
           />
         </div>
       )}
+
+      {/* Note preview strip */}
+      {hasNote && (
+        <div className="mt-1 px-1 py-0.5 rounded bg-primary/8 border border-primary/15 text-[10px] text-primary/70 leading-tight line-clamp-1">
+          {schedule!.notes}
+        </div>
+      )}
     </div>
   );
 }
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+type DayNotesDialogProps = {
+  selectedDay: string | null;
+  schedule: DaySchedule | null | undefined;
+  noteText: string;
+  onNoteChange: (v: string) => void;
+  onSave: () => void;
+  onClose: () => void;
+};
+
+function DayNotesDialog({ selectedDay, schedule, noteText, onNoteChange, onSave, onClose }: DayNotesDialogProps) {
+  if (!selectedDay) return null;
+  const parsedDate = parseISO(selectedDay);
+  const dayLabel = format(parsedDate, "EEEE, d 'de' MMMM", { locale: ptBR });
+  const savedNote = schedule?.notes ?? "";
+  const isDirty = noteText.trim() !== savedNote;
+  const slots = [
+    { label: "Principal", duo: schedule?.mainDuo },
+    { label: "Lateral",   duo: schedule?.sideDuo  },
+    { label: "Folga",     duo: schedule?.offDuo   },
+  ];
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-sm rounded-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 capitalize text-base">
+            <MessageSquare className="h-4 w-4 text-primary" />
+            {dayLabel}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-1 text-sm">
+          {slots.map(({ label, duo }) => (
+            <div key={label} className="flex items-center gap-2">
+              <span className="text-muted-foreground w-16 text-xs">{label}</span>
+              {duo ? (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: duo.color || "#ccc" }} />
+                  <span className="font-medium text-xs">{duo.name}</span>
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground italic">—</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-1.5 pt-1">
+          <label className="text-sm font-medium flex items-center gap-1.5">
+            <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
+            Observação
+          </label>
+          <Textarea
+            value={noteText}
+            onChange={(e) => onNoteChange(e.target.value)}
+            placeholder="Descreva ausências, situações adversas, trocas ou qualquer observação relevante para este dia..."
+            className="resize-none text-sm rounded-xl"
+            rows={4}
+            autoFocus
+          />
+          {noteText.trim() && (
+            <p className="text-[11px] text-muted-foreground">
+              A observação será salva ao clicar em &quot;Salvar alterações&quot; no calendário.
+            </p>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
+          {isDirty ? (
+            <Button size="sm" onClick={onSave}>Confirmar</Button>
+          ) : (
+            <Button size="sm" onClick={onClose}>Fechar</Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [activeDuo, setActiveDuo] = useState<Duo | null>(null);
   const [localSchedules, setLocalSchedules] = useState<Record<string, DaySchedule>>({});
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState("");
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
@@ -410,6 +516,25 @@ export default function Calendar() {
     });
   }
 
+  function handleDayClick(dateStr: string) {
+    const schedule = getMergedSchedule(dateStr);
+    setSelectedDay(dateStr);
+    setNoteText(schedule?.notes ?? "");
+  }
+
+  function handleNoteSave() {
+    if (!selectedDay) return;
+    setLocalSchedules((prev) => ({
+      ...prev,
+      [selectedDay]: {
+        ...(prev[selectedDay] ?? { date: selectedDay }),
+        date: selectedDay,
+        notes: noteText.trim() || null,
+      },
+    }));
+    setSelectedDay(null);
+  }
+
   function handleDragStart(event: DragStartEvent) {
     const duo = event.active.data.current?.duo as Duo;
     setActiveDuo(duo ?? null);
@@ -444,7 +569,7 @@ export default function Calendar() {
       mainDuoId: s.mainDuoId ?? null,
       sideDuoId: s.sideDuoId ?? null,
       offDuoId: s.offDuoId ?? null,
-      notes: null,
+      notes: s.notes ?? null,
     }));
 
     try {
@@ -476,6 +601,7 @@ export default function Calendar() {
   }
 
   return (
+    <>
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
@@ -566,6 +692,7 @@ export default function Calendar() {
                             dayAlerts={dayAlerts}
                             onDropDuo={handleDropDuo}
                             onClearSlot={handleClearSlot}
+                            onDayClick={handleDayClick}
                           />
                         );
                       })}
@@ -647,5 +774,15 @@ export default function Calendar() {
         )}
       </DragOverlay>
     </DndContext>
+
+    <DayNotesDialog
+      selectedDay={selectedDay}
+      schedule={selectedDay ? getMergedSchedule(selectedDay) : undefined}
+      noteText={noteText}
+      onNoteChange={setNoteText}
+      onSave={handleNoteSave}
+      onClose={() => setSelectedDay(null)}
+    />
+    </>
   );
 }
