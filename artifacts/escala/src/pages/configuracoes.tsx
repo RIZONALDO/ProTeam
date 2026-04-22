@@ -147,6 +147,20 @@ export default function Configuracoes() {
       toast.error("Informe uma senha para o novo usuário");
       return;
     }
+    if (userForm.password) {
+      if (userForm.password.length < 8) {
+        toast.error("A senha deve ter pelo menos 8 caracteres");
+        return;
+      }
+      if (!/[A-Z]/.test(userForm.password)) {
+        toast.error("A senha deve conter pelo menos uma letra maiúscula");
+        return;
+      }
+      if (!/\d/.test(userForm.password)) {
+        toast.error("A senha deve conter pelo menos um número");
+        return;
+      }
+    }
 
     setSavingUser(true);
     try {
@@ -375,6 +389,20 @@ export default function Configuracoes() {
                 onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
                 placeholder="••••••••"
               />
+              {(!editingUser || userForm.password) && (
+                <div className="space-y-1 pt-1">
+                  {[
+                    { ok: userForm.password.length >= 8, label: "Mínimo 8 caracteres" },
+                    { ok: /[A-Z]/.test(userForm.password), label: "Pelo menos 1 letra maiúscula" },
+                    { ok: /\d/.test(userForm.password), label: "Pelo menos 1 número" },
+                  ].map(({ ok, label }) => (
+                    <div key={label} className={`flex items-center gap-1.5 text-xs ${ok ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                      <span className={`inline-block h-1.5 w-1.5 rounded-full flex-shrink-0 ${ok ? "bg-green-500" : "bg-muted-foreground/40"}`} />
+                      {label}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Perfil</Label>

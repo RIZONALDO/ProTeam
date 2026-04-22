@@ -3,6 +3,15 @@ import { db, appUsersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAdmin, hashPassword } from "../lib/auth";
 
+const PASSWORD_RULES = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+function validatePassword(password: string): string | null {
+  if (password.length < 8) return "A senha deve ter pelo menos 8 caracteres";
+  if (!/[A-Z]/.test(password)) return "A senha deve conter pelo menos uma letra maiúscula";
+  if (!/\d/.test(password)) return "A senha deve conter pelo menos um número";
+  return null;
+}
+
 const router: IRouter = Router();
 
 router.get("/users", requireAdmin, async (_req, res): Promise<void> => {
@@ -21,6 +30,12 @@ router.post("/users", requireAdmin, async (req, res): Promise<void> => {
   const { username, password, displayName, role, permissions } = req.body;
   if (!username || !password || !displayName) {
     res.status(400).json({ error: "username, password e displayName são obrigatórios" });
+    return;
+  }
+
+  const pwError = validatePassword(password);
+  if (pwError) {
+    res.status(422).json({ error: pwError });
     return;
   }
 
@@ -51,6 +66,14 @@ router.post("/users", requireAdmin, async (req, res): Promise<void> => {
 router.put("/users/:id", requireAdmin, async (req, res): Promise<void> => {
   const id = parseInt(req.params["id"]!);
   const { password, displayName, role, permissions } = req.body;
+
+  if (password) {
+    const pwError = validatePassword(password);
+    if (pwError) {
+      res.status(422).json({ error: pwError });
+      return;
+    }
+  }
 
   const updates: Partial<typeof appUsersTable.$inferInsert> = {};
   if (displayName !== undefined) updates.displayName = displayName;
