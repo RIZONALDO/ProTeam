@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
+import ForceChangePassword from "@/pages/force-change-password";
 
 import Dashboard from "@/pages/dashboard";
 import Calendar from "@/pages/calendar";
@@ -39,6 +40,10 @@ function Router() {
 
   if (!user) {
     return <LoginPage />;
+  }
+
+  if (user.mustChangePassword) {
+    return <ForceChangePassword />;
   }
 
   return (

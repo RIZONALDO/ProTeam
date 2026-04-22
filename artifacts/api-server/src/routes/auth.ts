@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import { db, appUsersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { verifyPassword } from "../lib/auth";
+import { verifyPassword, hashPassword } from "../lib/auth";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -23,6 +24,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   req.session.displayName = user.displayName;
   req.session.userRole = user.role;
   req.session.permissions = user.permissions;
+  req.session.mustChangePassword = user.mustChangePassword;
 
   res.json({
     id: user.id,
@@ -30,6 +32,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     displayName: user.displayName,
     role: user.role,
     permissions: user.permissions,
+    mustChangePassword: user.mustChangePassword,
   });
 });
 
@@ -50,7 +53,50 @@ router.get("/auth/me", (req, res): void => {
     displayName: req.session.displayName,
     role: req.session.userRole,
     permissions: req.session.permissions,
+    mustChangePassword: req.session.mustChangePassword ?? false,
   });
+});
+
+router.post("/auth/change-password", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.session.userId!;
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: "Senha atual e nova senha são obrigatórias" });
+    return;
+  }
+
+  if (newPassword.length < 8) {
+    res.status(422).json({ error: "A nova senha deve ter pelo menos 8 caracteres" });
+    return;
+  }
+  if (!/[A-Z]/.test(newPassword)) {
+    res.status(422).json({ error: "A nova senha deve conter pelo menos uma letra maiúscula" });
+    return;
+  }
+  if (!/\d/.test(newPassword)) {
+    res.status(422).json({ error: "A nova senha deve conter pelo menos um número" });
+    return;
+  }
+
+  const [user] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, userId));
+  if (!user || !verifyPassword(currentPassword, user.passwordHash)) {
+    res.status(401).json({ error: "Senha atual incorreta" });
+    return;
+  }
+
+  if (currentPassword === newPassword) {
+    res.status(422).json({ error: "A nova senha deve ser diferente da senha atual" });
+    return;
+  }
+
+  await db.update(appUsersTable)
+    .set({ passwordHash: hashPassword(newPassword), mustChangePassword: false })
+    .where(eq(appUsersTable.id, userId));
+
+  req.session.mustChangePassword = false;
+
+  res.json({ ok: true });
 });
 
 export default router;

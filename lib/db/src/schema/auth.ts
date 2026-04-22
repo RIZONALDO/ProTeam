@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean } from "drizzle-orm/pg-core";
 
 export const appSettingsTable = pgTable("app_settings", {
   id: serial("id").primaryKey(),
@@ -14,6 +14,7 @@ export const appUsersTable = pgTable("app_users", {
   displayName: text("display_name").notNull(),
   role: text("role").notNull().default("user"),
   permissions: text("permissions").notNull().default(""),
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

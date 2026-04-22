@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Building2, Users, KeyRound, ShieldCheck, ImagePlus, X } from "lucide-react";
+import { PasswordInput } from "@/components/ui/password-input";
 
 type AppUser = {
   id: number;
@@ -510,11 +511,11 @@ export default function Configuracoes() {
             </div>
             <div className="space-y-1.5">
               <Label>{editingUser ? "Nova senha (deixe em branco para manter)" : "Senha *"}</Label>
-              <Input
-                type="password"
+              <PasswordInput
                 value={userForm.password}
                 onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
                 placeholder="••••••••"
+                autoComplete={editingUser ? "new-password" : "new-password"}
               />
               {(!editingUser || userForm.password) && (
                 <div className="space-y-1 pt-1">

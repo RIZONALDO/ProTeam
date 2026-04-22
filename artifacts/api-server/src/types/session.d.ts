@@ -7,5 +7,6 @@ declare module "express-session" {
     displayName: string;
     userRole: string;
     permissions: string;
+    mustChangePassword: boolean;
   }
 }
