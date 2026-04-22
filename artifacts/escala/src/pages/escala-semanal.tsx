@@ -131,9 +131,9 @@ export default function EscalaSemanal() {
           <span className="text-sm">{duo.name}</span>
         </div>
         {variant !== "off" && duo.members && duo.members.length > 0 && (
-          <div className="flex items-center gap-1 ml-3.5">
+          <div className="flex flex-col gap-1 ml-3.5">
             {duo.members.map((m) => (
-              <div key={m.id} className="flex items-center gap-1">
+              <div key={m.id} className="flex items-center gap-1.5">
                 <MemberAvatar member={m} size="sm" />
                 <span className="text-[10px] text-muted-foreground leading-none">{m.name.split(" ")[0]}</span>
               </div>
