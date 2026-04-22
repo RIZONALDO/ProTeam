@@ -13,4 +13,6 @@ export interface UpdateMemberBody {
   contact?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  photoUrl?: string | null;
 }

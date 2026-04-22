@@ -17,6 +17,8 @@ export interface Member {
   contact?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  photoUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -28,6 +30,8 @@ export interface CreateMemberBody {
   contact?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  photoUrl?: string | null;
 }
 
 export interface UpdateMemberBody {
@@ -37,6 +41,8 @@ export interface UpdateMemberBody {
   contact?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  photoUrl?: string | null;
 }
 
 export interface Duo {
@@ -243,6 +249,20 @@ export interface ChangeLog {
   /** @nullable */
   newState?: string | null;
   createdAt: string;
+}
+
+export interface RequestUploadUrlBody {
+  /** @minLength 1 */
+  name: string;
+  /** @minimum 1 */
+  size: number;
+  /** @minLength 1 */
+  contentType: string;
+}
+
+export interface RequestUploadUrlResponse {
+  uploadURL: string;
+  objectPath: string;
 }
 
 export type ListSchedulesParams = {

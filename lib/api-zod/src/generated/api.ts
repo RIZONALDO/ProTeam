@@ -8,6 +8,28 @@
 import * as zod from "zod";
 
 /**
+ * @summary Request a presigned URL for file upload
+ */
+
+export const RequestUploadUrlBody = zod.object({
+  name: zod.string().min(1),
+  size: zod.number().min(1),
+  contentType: zod.string().min(1),
+});
+
+export const RequestUploadUrlResponse = zod.object({
+  uploadURL: zod.string(),
+  objectPath: zod.string(),
+});
+
+/**
+ * @summary Serve an object entity
+ */
+export const GetStorageObjectParams = zod.object({
+  objectPath: zod.coerce.string(),
+});
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -23,6 +45,7 @@ export const ListMembersResponseItem = zod.object({
   role: zod.string(),
   contact: zod.string().nullish(),
   notes: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -36,6 +59,7 @@ export const CreateMemberBody = zod.object({
   role: zod.string(),
   contact: zod.string().nullish(),
   notes: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
 });
 
 /**
@@ -51,6 +75,7 @@ export const GetMemberResponse = zod.object({
   role: zod.string(),
   contact: zod.string().nullish(),
   notes: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -67,6 +92,7 @@ export const UpdateMemberBody = zod.object({
   role: zod.string().optional(),
   contact: zod.string().nullish(),
   notes: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
 });
 
 export const UpdateMemberResponse = zod.object({
@@ -75,6 +101,7 @@ export const UpdateMemberResponse = zod.object({
   role: zod.string(),
   contact: zod.string().nullish(),
   notes: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -103,6 +130,7 @@ export const ListDuosResponseItem = zod.object({
       role: zod.string(),
       contact: zod.string().nullish(),
       notes: zod.string().nullish(),
+      photoUrl: zod.string().nullish(),
       createdAt: zod.string(),
       updatedAt: zod.string(),
     }),
@@ -141,6 +169,7 @@ export const GetDuoResponse = zod.object({
       role: zod.string(),
       contact: zod.string().nullish(),
       notes: zod.string().nullish(),
+      photoUrl: zod.string().nullish(),
       createdAt: zod.string(),
       updatedAt: zod.string(),
     }),
@@ -175,6 +204,7 @@ export const UpdateDuoResponse = zod.object({
       role: zod.string(),
       contact: zod.string().nullish(),
       notes: zod.string().nullish(),
+      photoUrl: zod.string().nullish(),
       createdAt: zod.string(),
       updatedAt: zod.string(),
     }),
@@ -286,6 +316,7 @@ export const ListSchedulesResponseItem = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -310,6 +341,7 @@ export const ListSchedulesResponseItem = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -334,6 +366,7 @@ export const ListSchedulesResponseItem = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -415,6 +448,7 @@ export const GetScheduleResponse = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -439,6 +473,7 @@ export const GetScheduleResponse = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -463,6 +498,7 @@ export const GetScheduleResponse = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -539,6 +575,7 @@ export const UpdateScheduleResponse = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -563,6 +600,7 @@ export const UpdateScheduleResponse = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -587,6 +625,7 @@ export const UpdateScheduleResponse = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -663,6 +702,7 @@ export const GetScheduleByDateResponse = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -687,6 +727,7 @@ export const GetScheduleByDateResponse = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -711,6 +752,7 @@ export const GetScheduleByDateResponse = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -788,6 +830,7 @@ export const BulkUpdateSchedulesResponseItem = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -812,6 +855,7 @@ export const BulkUpdateSchedulesResponseItem = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -836,6 +880,7 @@ export const BulkUpdateSchedulesResponseItem = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -1002,6 +1047,7 @@ export const GetDashboardSummaryResponse = zod.object({
             role: zod.string(),
             contact: zod.string().nullish(),
             notes: zod.string().nullish(),
+            photoUrl: zod.string().nullish(),
             createdAt: zod.string(),
             updatedAt: zod.string(),
           }),
@@ -1036,6 +1082,7 @@ export const GetDashboardSummaryResponse = zod.object({
                 role: zod.string(),
                 contact: zod.string().nullish(),
                 notes: zod.string().nullish(),
+                photoUrl: zod.string().nullish(),
                 createdAt: zod.string(),
                 updatedAt: zod.string(),
               }),
@@ -1060,6 +1107,7 @@ export const GetDashboardSummaryResponse = zod.object({
                 role: zod.string(),
                 contact: zod.string().nullish(),
                 notes: zod.string().nullish(),
+                photoUrl: zod.string().nullish(),
                 createdAt: zod.string(),
                 updatedAt: zod.string(),
               }),
@@ -1084,6 +1132,7 @@ export const GetDashboardSummaryResponse = zod.object({
                 role: zod.string(),
                 contact: zod.string().nullish(),
                 notes: zod.string().nullish(),
+                photoUrl: zod.string().nullish(),
                 createdAt: zod.string(),
                 updatedAt: zod.string(),
               }),
@@ -1169,6 +1218,7 @@ export const GetDuoStatsResponseItem = zod.object({
         role: zod.string(),
         contact: zod.string().nullish(),
         notes: zod.string().nullish(),
+        photoUrl: zod.string().nullish(),
         createdAt: zod.string(),
         updatedAt: zod.string(),
       }),

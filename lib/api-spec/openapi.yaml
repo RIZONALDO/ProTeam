@@ -9,6 +9,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: storage
+    description: Object storage operations
   - name: members
     description: Member management
   - name: duos
@@ -23,6 +25,51 @@ tags:
     description: Reports and statistics
 
 paths:
+  /storage/uploads/request-url:
+    post:
+      tags: [storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestUploadUrlBody'
+      responses:
+        '200':
+          description: Presigned upload URL generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestUploadUrlResponse'
+        '400':
+          description: Missing or invalid required fields.
+        '500':
+          description: Failed to generate upload URL.
+
+  /storage/objects/{objectPath}:
+    get:
+      tags: [storage]
+      operationId: getStorageObject
+      summary: Serve an object entity
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Object content.
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Object not found.
+
   /healthz:
     get:
       operationId: healthCheck
@@ -677,6 +724,8 @@ components:
           type: ["string", "null"]
         notes:
           type: ["string", "null"]
+        photoUrl:
+          type: ["string", "null"]
         createdAt:
           type: string
         updatedAt:
@@ -699,6 +748,8 @@ components:
           type: ["string", "null"]
         notes:
           type: ["string", "null"]
+        photoUrl:
+          type: ["string", "null"]
       required:
         - name
         - role
@@ -713,6 +764,8 @@ components:
         contact:
           type: ["string", "null"]
         notes:
+          type: ["string", "null"]
+        photoUrl:
           type: ["string", "null"]
 
     Duo:
@@ -1100,3 +1153,26 @@ components:
         - date
         - action
         - createdAt
+
+    RequestUploadUrlBody:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          minimum: 1
+        contentType:
+          type: string
+          minLength: 1
+
+    RequestUploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+        objectPath:
+          type: string

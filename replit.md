@@ -12,6 +12,7 @@ A full-stack internal scheduling platform for a video content production team. B
 - `lib/api-spec` — OpenAPI 3.0 spec + orval codegen config
 - `lib/api-zod` — Zod validators generated from OpenAPI spec
 - `lib/api-client-react` — React Query hooks generated from OpenAPI spec
+- `lib/object-storage-web` — `useUpload` hook for presigned GCS uploads
 
 ## Features
 
@@ -20,7 +21,7 @@ A full-stack internal scheduling platform for a video content production team. B
 - **Escala Semanal** — Weekly schedule view with member details
 - **Escala Mensal** — Monthly read-only view with statistics sidebar
 - **Duplas** — CRUD for team pairs (color-coded, member selection)
-- **Membros** — CRUD for individual team members with roles/contacts
+- **Membros** — CRUD for individual team members with roles/contacts/photo upload
 - **Produtores** — CRUD for producers + week assignment
 - **Relatórios** — Statistics tabs: duo stats, producer stats, change history
 
@@ -33,7 +34,7 @@ A full-stack internal scheduling platform for a video content production team. B
 
 ## Database Schema
 
-- `members` — team members (name, role, contact, notes)
+- `members` — team members (name, role, contact, notes, photoUrl)
 - `duos` — team pairs with color (name, color, notes)
 - `duo_members` — join table
 - `producers` — producers (name, contact, notes)
@@ -69,5 +70,5 @@ pnpm --filter @workspace/escala run dev
 pnpm --filter @workspace/api-spec run codegen
 
 # DB push
-pnpm --filter @workspace/db run db:push
+pnpm --filter @workspace/db run push
 ```

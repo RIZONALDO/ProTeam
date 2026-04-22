@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   useListMembers,
   getListMembersQueryKey,
@@ -7,7 +7,7 @@ import {
   useDeleteMember,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit2, Trash2, User, Search } from "lucide-react";
+import { Plus, Edit2, Trash2, User, Search, Camera, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,12 +32,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { useUpload } from "@workspace/object-storage-web";
 
 type MemberForm = {
   name: string;
   role: string;
   contact: string;
   notes: string;
+  photoUrl: string | null;
 };
 
 const defaultForm = (): MemberForm => ({
@@ -45,6 +47,7 @@ const defaultForm = (): MemberForm => ({
   role: "",
   contact: "",
   notes: "",
+  photoUrl: null,
 });
 
 const ROLE_COLORS: Record<string, string> = {
@@ -78,18 +81,26 @@ function getAvatarColor(id: number) {
   return AVATAR_COLORS[id % AVATAR_COLORS.length];
 }
 
+function photoSrc(objectPath: string | null | undefined) {
+  if (!objectPath) return null;
+  return `/api/storage${objectPath}`;
+}
+
 export default function Membros() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<MemberForm>(defaultForm());
   const [search, setSearch] = useState("");
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
   const { data: members, isLoading } = useListMembers({ query: { queryKey: getListMembersQueryKey() } });
   const createMember = useCreateMember();
   const updateMember = useUpdateMember();
   const deleteMember = useDeleteMember();
+  const { uploadFile, isUploading } = useUpload();
 
   const filtered = members?.filter(
     (m) =>
@@ -100,13 +111,44 @@ export default function Membros() {
   function openCreate() {
     setEditId(null);
     setForm(defaultForm());
+    setPhotoPreview(null);
     setDialogOpen(true);
   }
 
   function openEdit(m: NonNullable<typeof members>[0]) {
     setEditId(m.id);
-    setForm({ name: m.name, role: m.role || "", contact: m.contact || "", notes: m.notes || "" });
+    setForm({
+      name: m.name,
+      role: m.role || "",
+      contact: m.contact || "",
+      notes: m.notes || "",
+      photoUrl: m.photoUrl ?? null,
+    });
+    setPhotoPreview(m.photoUrl ? photoSrc(m.photoUrl) : null);
     setDialogOpen(true);
+  }
+
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const localPreview = URL.createObjectURL(file);
+    setPhotoPreview(localPreview);
+
+    const result = await uploadFile(file);
+    if (result) {
+      setForm((prev) => ({ ...prev, photoUrl: result.objectPath }));
+      toast.success("Foto carregada com sucesso!");
+    } else {
+      toast.error("Erro ao fazer upload da foto.");
+      setPhotoPreview(form.photoUrl ? photoSrc(form.photoUrl) : null);
+    }
+  }
+
+  function handleRemovePhoto() {
+    setForm((prev) => ({ ...prev, photoUrl: null }));
+    setPhotoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function handleSubmit() {
@@ -118,12 +160,24 @@ export default function Membros() {
       if (editId) {
         await updateMember.mutateAsync({
           id: editId,
-          data: { name: form.name, role: form.role || null, contact: form.contact || null, notes: form.notes || null },
+          data: {
+            name: form.name,
+            role: form.role || null,
+            contact: form.contact || null,
+            notes: form.notes || null,
+            photoUrl: form.photoUrl,
+          },
         });
         toast.success("Membro atualizado!");
       } else {
         await createMember.mutateAsync({
-          data: { name: form.name, role: form.role || null, contact: form.contact || null, notes: form.notes || null },
+          data: {
+            name: form.name,
+            role: form.role || null,
+            contact: form.contact || null,
+            notes: form.notes || null,
+            photoUrl: form.photoUrl,
+          },
         });
         toast.success("Membro criado!");
       }
@@ -200,12 +254,20 @@ export default function Membros() {
             <Card key={member.id} className="rounded-xl shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
-                    style={{ backgroundColor: getAvatarColor(member.id) }}
-                  >
-                    {getInitials(member.name)}
-                  </div>
+                  {member.photoUrl ? (
+                    <img
+                      src={photoSrc(member.photoUrl)!}
+                      alt={member.name}
+                      className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
+                      style={{ backgroundColor: getAvatarColor(member.id) }}
+                    >
+                      {getInitials(member.name)}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -250,6 +312,49 @@ export default function Membros() {
             <DialogTitle>{editId ? "Editar Membro" : "Novo Membro"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative">
+                {photoPreview ? (
+                  <div className="relative">
+                    <img
+                      src={photoPreview}
+                      alt="Foto do membro"
+                      className="w-20 h-20 rounded-full object-cover border-2 border-border"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemovePhoto}
+                      className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center hover:bg-destructive/80 transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center border-2 border-dashed border-border">
+                    <User className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoChange}
+                disabled={isUploading}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                {isUploading ? "Enviando..." : "Escolher foto"}
+              </Button>
+            </div>
+
             <div>
               <Label htmlFor="name">Nome *</Label>
               <Input
@@ -289,7 +394,10 @@ export default function Membros() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} disabled={createMember.isPending || updateMember.isPending}>
+            <Button
+              onClick={handleSubmit}
+              disabled={createMember.isPending || updateMember.isPending || isUploading}
+            >
               {editId ? "Salvar" : "Criar"}
             </Button>
           </DialogFooter>

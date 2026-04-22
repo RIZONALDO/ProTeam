@@ -14,6 +14,8 @@ export interface Member {
   contact?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  photoUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }

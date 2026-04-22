@@ -30,6 +30,8 @@ export * from "./member";
 export * from "./producer";
 export * from "./producerStats";
 export * from "./producerWeek";
+export * from "./requestUploadUrlBody";
+export * from "./requestUploadUrlResponse";
 export * from "./scheduleConflict";
 export * from "./scheduleEntry";
 export * from "./scheduleWithRelations";

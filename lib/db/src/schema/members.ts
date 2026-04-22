@@ -8,6 +8,7 @@ export const membersTable = pgTable("members", {
   role: text("role").notNull(),
   contact: text("contact"),
   notes: text("notes"),
+  photoUrl: text("photo_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
