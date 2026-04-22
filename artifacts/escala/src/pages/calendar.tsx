@@ -50,6 +50,8 @@ import {
   Trash2,
   CheckCircle2,
   UserCheck,
+  LayoutList,
+  LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -205,41 +207,73 @@ function DroppableSlot({
   label,
   onClear,
   hasOverride,
+  expanded,
+  slotOverrides,
 }: {
   slotId: string;
   duo?: Duo | null;
   label: string;
   onClear?: () => void;
   hasOverride?: boolean;
+  expanded?: boolean;
+  slotOverrides?: DayOverride[];
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: slotId });
 
   return (
     <div
       ref={setNodeRef}
-      className={`relative rounded min-h-[28px] flex items-center transition-colors ${
+      className={`relative rounded transition-colors ${
         isOver ? "bg-primary/10 ring-1 ring-primary" : "bg-muted/30"
-      }`}
+      } ${expanded && duo ? "py-1" : "min-h-[28px] flex items-center"}`}
     >
       {duo ? (
-        <div className="flex items-center gap-1 px-2 py-1 w-full">
-          <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: duo.color || "#ccc" }} />
-          <span className="text-[10px] font-medium truncate flex-1">{duo.name}</span>
-          {hasOverride && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <ArrowLeftRight className="h-2.5 w-2.5 text-amber-500 flex-shrink-0" />
-              </TooltipTrigger>
-              <TooltipContent className="text-xs">Substituição ativa</TooltipContent>
-            </Tooltip>
-          )}
-          {onClear && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onClear(); }}
-              className="text-muted-foreground hover:text-destructive flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <X className="h-3 w-3" />
-            </button>
+        <div className="w-full">
+          {/* Duo header row */}
+          <div className="flex items-center gap-1 px-2 py-0.5">
+            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: duo.color || "#ccc" }} />
+            <span className="text-[10px] font-semibold truncate flex-1">{duo.name}</span>
+            {hasOverride && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <ArrowLeftRight className="h-2.5 w-2.5 text-amber-500 flex-shrink-0" />
+                </TooltipTrigger>
+                <TooltipContent className="text-xs">Substituição ativa</TooltipContent>
+              </Tooltip>
+            )}
+            {onClear && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onClear(); }}
+                className="text-muted-foreground hover:text-destructive flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Expanded: member list */}
+          {expanded && (duo.members ?? []).length > 0 && (
+            <div className="px-2 pb-0.5 space-y-0.5">
+              {(duo.members ?? []).map((member) => {
+                const override = slotOverrides?.find((o) => o.replacedMemberId === member.id);
+                if (override) {
+                  return (
+                    <div key={member.id} className="flex items-center gap-0.5">
+                      <ArrowLeftRight className="h-2 w-2 text-amber-500 flex-shrink-0" />
+                      <span className="text-[9px] text-amber-700 dark:text-amber-400 font-medium truncate leading-tight">
+                        {override.substituteMember?.name ?? "?"}
+                      </span>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={member.id} className="flex items-center gap-0.5">
+                    <User className="h-2 w-2 text-muted-foreground flex-shrink-0" />
+                    <span className="text-[9px] text-muted-foreground truncate leading-tight">{member.name}</span>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       ) : (
@@ -258,6 +292,7 @@ function CalendarDay({
   onClearSlot,
   onDayClick,
   dayOverrides,
+  expanded,
 }: {
   date: Date;
   schedule?: DaySchedule;
@@ -267,6 +302,7 @@ function CalendarDay({
   onClearSlot: (date: string, role: "main" | "side" | "off") => void;
   onDayClick: (date: string) => void;
   dayOverrides: DayOverride[];
+  expanded: boolean;
 }) {
   const dateStr = format(date, "yyyy-MM-dd");
   const today = isToday(date);
@@ -279,7 +315,8 @@ function CalendarDay({
 
   return (
     <div
-      className={`group relative flex flex-col p-1.5 border rounded-lg min-h-[110px] transition-colors
+      className={`group relative flex flex-col p-1.5 border rounded-lg transition-colors
+        ${expanded ? "min-h-[155px]" : "min-h-[110px]"}
         ${!isCurrentMonth ? "opacity-30 bg-muted/20 pointer-events-none" : "bg-card hover:bg-muted/10 cursor-pointer"}
         ${today ? "ring-2 ring-primary" : ""}
         ${alertSeverity === "error" ? "border-destructive/60" : alertSeverity === "warning" ? "border-amber-400/60" : "border-border"}
@@ -337,6 +374,8 @@ function CalendarDay({
             label="Principal"
             onClear={() => onClearSlot(dateStr, "main")}
             hasOverride={overridesForDuo(schedule?.mainDuoId).length > 0}
+            expanded={expanded}
+            slotOverrides={overridesForDuo(schedule?.mainDuoId)}
           />
           <DroppableSlot
             slotId={`${dateStr}:side`}
@@ -344,6 +383,8 @@ function CalendarDay({
             label="Lateral"
             onClear={() => onClearSlot(dateStr, "side")}
             hasOverride={overridesForDuo(schedule?.sideDuoId).length > 0}
+            expanded={expanded}
+            slotOverrides={overridesForDuo(schedule?.sideDuoId)}
           />
           <DroppableSlot
             slotId={`${dateStr}:off`}
@@ -351,6 +392,8 @@ function CalendarDay({
             label="Folga"
             onClear={() => onClearSlot(dateStr, "off")}
             hasOverride={overridesForDuo(schedule?.offDuoId).length > 0}
+            expanded={expanded}
+            slotOverrides={overridesForDuo(schedule?.offDuoId)}
           />
         </div>
       )}
@@ -635,6 +678,7 @@ export default function Calendar() {
   const [noteText, setNoteText] = useState("");
   const [dayOverrides, setDayOverrides] = useState<DayOverride[]>([]);
   const [loadingOverrides, setLoadingOverrides] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
@@ -950,6 +994,21 @@ export default function Calendar() {
               </>
             )}
             <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={expanded ? "secondary" : "outline"}
+                    size="icon"
+                    onClick={() => setExpanded((v) => !v)}
+                    aria-label={expanded ? "Compactar dias" : "Expandir dias (ver integrantes)"}
+                  >
+                    {expanded ? <LayoutGrid className="h-4 w-4" /> : <LayoutList className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="text-xs">
+                  {expanded ? "Compactar dias" : "Ver integrantes por dia"}
+                </TooltipContent>
+              </Tooltip>
               <Button variant="outline" size="icon" onClick={prevMonth}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -1003,7 +1062,7 @@ export default function Calendar() {
                     )}
                     <div className="grid grid-cols-7 gap-1">
                       {weekDays.map((date, idx) => {
-                        if (!date) return <div key={`pad-${weekIdx}-${idx}`} className="min-h-[110px]" />;
+                        if (!date) return <div key={`pad-${weekIdx}-${idx}`} className={expanded ? "min-h-[155px]" : "min-h-[110px]"} />;
                         const dateStr = format(date, "yyyy-MM-dd");
                         const schedule = getMergedSchedule(dateStr);
                         return (
@@ -1017,6 +1076,7 @@ export default function Calendar() {
                             onClearSlot={handleClearSlot}
                             onDayClick={handleDayClick}
                             dayOverrides={overridesByDate.get(dateStr) ?? []}
+                            expanded={expanded}
                           />
                         );
                       })}
