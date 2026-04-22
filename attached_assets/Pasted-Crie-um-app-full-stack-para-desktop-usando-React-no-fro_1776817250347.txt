@@ -1,0 +1,40 @@
+Crie um app full-stack para desktop usando React no frontend e um backend simples com banco de dados persistente. O sistema será uma plataforma interna de gestão de escala para equipe de criadores de conteúdo.
+
+Menu lateral:
+Dashboard, Calendário, Escala semanal, Escala mensal, Duplas, Membros, Produtores, Relatórios.
+
+Funcionalidade central:
+O Calendário é a área principal de edição e deve funcionar como um tabuleiro visual com drag and drop. Preciso arrastar as duplas pelos dias do mês. Sempre que eu alterar algo no Calendário, a Escala semanal e a Escala mensal devem ser atualizadas automaticamente.
+
+Regras da escala:
+- 3 duplas
+- por dia: 1 dupla principal, 1 dupla lateral, 1 dupla de folga
+- a dupla principal gira em ciclo 1-2-3
+- a dupla lateral só pode atuar novamente depois de pelo menos 1 dia de folga
+- se houver conflito na lógica, o sistema deve mostrar alerta visual
+
+Cadastros:
+Membros: nome, função, contato, observações
+Duplas: nome da dupla, integrantes vinculados, observações
+Produtores: nome, contato, observações
+Escalas: data, dupla principal, dupla lateral, dupla de folga, produtor da semana, observações
+
+Produtores:
+Existem 2 produtores. A cada semana, 1 produtor fica responsável por todas as demandas das 3 duplas, incluindo logística, transporte, alimentação e garantia dos roteiros no dia da captação.
+
+Dashboard:
+Resumo da semana, produtor responsável, alertas de conflito e visão resumida das duplas.
+
+Escala semanal:
+Mostrar por dia a dupla principal, lateral, folga e o produtor da semana.
+
+Escala mensal:
+Ser o espelho organizado do calendário mensal.
+
+Relatórios:
+Dias por dupla em principal, lateral e folga, produtor por semana e histórico de mudanças.
+
+Design:
+interface moderna, limpa, profissional, com foco total em desktop, cards arredondados, calendário grande e visual estilo plataforma SaaS.
+
+Construa primeiro a estrutura das páginas, depois o banco de dados, depois os cadastros, depois a lógica do calendário com drag and drop e por fim as sincronizações automáticas e relatórios.

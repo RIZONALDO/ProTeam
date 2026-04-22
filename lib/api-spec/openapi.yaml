@@ -1,22 +1,33 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Plataforma de Escala - Content Team Scheduling API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: members
+    description: Member management
+  - name: duos
+    description: Duo (dupla) management
+  - name: producers
+    description: Producer management
+  - name: schedules
+    description: Schedule management
+  - name: dashboard
+    description: Dashboard and summary data
+  - name: reports
+    description: Reports and statistics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +35,625 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # Members
+  /members:
+    get:
+      operationId: listMembers
+      tags: [members]
+      summary: List all members
+      responses:
+        "200":
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Member"
+    post:
+      operationId: createMember
+      tags: [members]
+      summary: Create a member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMemberBody"
+      responses:
+        "201":
+          description: Member created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+
+  /members/{id}:
+    get:
+      operationId: getMember
+      tags: [members]
+      summary: Get a member by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateMember
+      tags: [members]
+      summary: Update a member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberBody"
+      responses:
+        "200":
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteMember
+      tags: [members]
+      summary: Delete a member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Duos
+  /duos:
+    get:
+      operationId: listDuos
+      tags: [duos]
+      summary: List all duos
+      responses:
+        "200":
+          description: List of duos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DuoWithMembers"
+    post:
+      operationId: createDuo
+      tags: [duos]
+      summary: Create a duo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDuoBody"
+      responses:
+        "201":
+          description: Duo created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuoWithMembers"
+
+  /duos/{id}:
+    get:
+      operationId: getDuo
+      tags: [duos]
+      summary: Get a duo by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Duo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuoWithMembers"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateDuo
+      tags: [duos]
+      summary: Update a duo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDuoBody"
+      responses:
+        "200":
+          description: Updated duo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuoWithMembers"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteDuo
+      tags: [duos]
+      summary: Delete a duo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Producers
+  /producers:
+    get:
+      operationId: listProducers
+      tags: [producers]
+      summary: List all producers
+      responses:
+        "200":
+          description: List of producers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Producer"
+    post:
+      operationId: createProducer
+      tags: [producers]
+      summary: Create a producer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProducerBody"
+      responses:
+        "201":
+          description: Producer created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Producer"
+
+  /producers/{id}:
+    get:
+      operationId: getProducer
+      tags: [producers]
+      summary: Get a producer by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Producer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Producer"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateProducer
+      tags: [producers]
+      summary: Update a producer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProducerBody"
+      responses:
+        "200":
+          description: Updated producer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Producer"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteProducer
+      tags: [producers]
+      summary: Delete a producer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Schedules
+  /schedules:
+    get:
+      operationId: listSchedules
+      tags: [schedules]
+      summary: List schedules
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: month
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of schedules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScheduleWithRelations"
+    post:
+      operationId: createSchedule
+      tags: [schedules]
+      summary: Create a schedule entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScheduleBody"
+      responses:
+        "201":
+          description: Schedule created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleWithRelations"
+        "409":
+          description: Conflict - schedule already exists for date
+
+  /schedules/{id}:
+    get:
+      operationId: getSchedule
+      tags: [schedules]
+      summary: Get a schedule by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Schedule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleWithRelations"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateSchedule
+      tags: [schedules]
+      summary: Update a schedule entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateScheduleBody"
+      responses:
+        "200":
+          description: Updated schedule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleWithRelations"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteSchedule
+      tags: [schedules]
+      summary: Delete a schedule entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /schedules/date/{date}:
+    get:
+      operationId: getScheduleByDate
+      tags: [schedules]
+      summary: Get schedule for a specific date (YYYY-MM-DD)
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Schedule for date
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleWithRelations"
+        "404":
+          description: Not found
+
+  /schedules/bulk-update:
+    post:
+      operationId: bulkUpdateSchedules
+      tags: [schedules]
+      summary: Bulk upsert schedules (for drag-and-drop calendar)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkUpdateSchedulesBody"
+      responses:
+        "200":
+          description: Schedules updated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScheduleWithRelations"
+
+  # Producer Week Assignments
+  /producer-weeks:
+    get:
+      operationId: listProducerWeeks
+      tags: [schedules]
+      summary: List producer week assignments
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: month
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of producer week assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProducerWeek"
+    post:
+      operationId: createProducerWeek
+      tags: [schedules]
+      summary: Create a producer week assignment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProducerWeekBody"
+      responses:
+        "201":
+          description: Producer week assignment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProducerWeek"
+
+  /producer-weeks/{id}:
+    patch:
+      operationId: updateProducerWeek
+      tags: [schedules]
+      summary: Update a producer week assignment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProducerWeekBody"
+      responses:
+        "200":
+          description: Updated producer week assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProducerWeek"
+    delete:
+      operationId: deleteProducerWeek
+      tags: [schedules]
+      summary: Delete a producer week assignment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Dashboard
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary for current/specified week
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            description: Any date within the desired week (YYYY-MM-DD), defaults to today
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/conflicts:
+    get:
+      operationId: listConflicts
+      tags: [dashboard]
+      summary: List schedule conflicts for a month
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: month
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of conflicts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScheduleConflict"
+
+  # Reports
+  /reports/duo-stats:
+    get:
+      operationId: getDuoStats
+      tags: [reports]
+      summary: Get statistics per duo for a period
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: month
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Duo statistics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DuoStats"
+
+  /reports/producer-stats:
+    get:
+      operationId: getProducerStats
+      tags: [reports]
+      summary: Get statistics per producer for a period
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: month
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Producer statistics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProducerStats"
+
+  /reports/change-history:
+    get:
+      operationId: getChangeHistory
+      tags: [reports]
+      summary: Get schedule change history
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Change history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChangeLog"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +664,439 @@ components:
       required:
         - status
 
+    Member:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+        contact:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - role
+        - createdAt
+        - updatedAt
+
+    CreateMemberBody:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+        contact:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+      required:
+        - name
+        - role
+
+    UpdateMemberBody:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+        contact:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    Duo:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        notes:
+          type: ["string", "null"]
+        color:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+
+    DuoWithMembers:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        notes:
+          type: ["string", "null"]
+        color:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/Member"
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+        - members
+
+    CreateDuoBody:
+      type: object
+      properties:
+        name:
+          type: string
+        notes:
+          type: ["string", "null"]
+        color:
+          type: ["string", "null"]
+        memberIds:
+          type: array
+          items:
+            type: integer
+      required:
+        - name
+
+    UpdateDuoBody:
+      type: object
+      properties:
+        name:
+          type: string
+        notes:
+          type: ["string", "null"]
+        color:
+          type: ["string", "null"]
+        memberIds:
+          type: array
+          items:
+            type: integer
+
+    Producer:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        contact:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+
+    CreateProducerBody:
+      type: object
+      properties:
+        name:
+          type: string
+        contact:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+      required:
+        - name
+
+    UpdateProducerBody:
+      type: object
+      properties:
+        name:
+          type: string
+        contact:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    ScheduleEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          description: Date in YYYY-MM-DD format
+        mainDuoId:
+          type: ["integer", "null"]
+        sideDuoId:
+          type: ["integer", "null"]
+        offDuoId:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - date
+        - createdAt
+        - updatedAt
+
+    ScheduleWithRelations:
+      type: object
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+        mainDuoId:
+          type: ["integer", "null"]
+        sideDuoId:
+          type: ["integer", "null"]
+        offDuoId:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+        mainDuo:
+          oneOf:
+            - $ref: "#/components/schemas/DuoWithMembers"
+            - type: "null"
+        sideDuo:
+          oneOf:
+            - $ref: "#/components/schemas/DuoWithMembers"
+            - type: "null"
+        offDuo:
+          oneOf:
+            - $ref: "#/components/schemas/DuoWithMembers"
+            - type: "null"
+        producerWeek:
+          oneOf:
+            - $ref: "#/components/schemas/ProducerWeek"
+            - type: "null"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - date
+        - createdAt
+        - updatedAt
+
+    CreateScheduleBody:
+      type: object
+      properties:
+        date:
+          type: string
+        mainDuoId:
+          type: ["integer", "null"]
+        sideDuoId:
+          type: ["integer", "null"]
+        offDuoId:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+      required:
+        - date
+
+    UpdateScheduleBody:
+      type: object
+      properties:
+        mainDuoId:
+          type: ["integer", "null"]
+        sideDuoId:
+          type: ["integer", "null"]
+        offDuoId:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+
+    BulkUpdateSchedulesBody:
+      type: object
+      properties:
+        schedules:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateScheduleBody"
+      required:
+        - schedules
+
+    ProducerWeek:
+      type: object
+      properties:
+        id:
+          type: integer
+        weekStart:
+          type: string
+          description: ISO date of Monday that starts the week (YYYY-MM-DD)
+        producerId:
+          type: ["integer", "null"]
+        producer:
+          oneOf:
+            - $ref: "#/components/schemas/Producer"
+            - type: "null"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - weekStart
+        - createdAt
+        - updatedAt
+
+    CreateProducerWeekBody:
+      type: object
+      properties:
+        weekStart:
+          type: string
+        producerId:
+          type: ["integer", "null"]
+      required:
+        - weekStart
+
+    UpdateProducerWeekBody:
+      type: object
+      properties:
+        producerId:
+          type: ["integer", "null"]
+
+    DashboardSummary:
+      type: object
+      properties:
+        weekStart:
+          type: string
+        weekEnd:
+          type: string
+        currentProducer:
+          oneOf:
+            - $ref: "#/components/schemas/Producer"
+            - type: "null"
+        scheduleCount:
+          type: integer
+        conflictsCount:
+          type: integer
+        duoSummary:
+          type: array
+          items:
+            $ref: "#/components/schemas/DuoWeekSummary"
+        upcomingDays:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleWithRelations"
+      required:
+        - weekStart
+        - weekEnd
+        - scheduleCount
+        - conflictsCount
+        - duoSummary
+        - upcomingDays
+
+    DuoWeekSummary:
+      type: object
+      properties:
+        duo:
+          $ref: "#/components/schemas/DuoWithMembers"
+        mainDays:
+          type: integer
+        sideDays:
+          type: integer
+        offDays:
+          type: integer
+      required:
+        - duo
+        - mainDays
+        - sideDays
+        - offDays
+
+    ScheduleConflict:
+      type: object
+      properties:
+        date:
+          type: string
+        type:
+          type: string
+          description: "Type of conflict: side_no_rest, duplicate_assignment, missing_duo"
+        description:
+          type: string
+        duoId:
+          type: ["integer", "null"]
+        duoName:
+          type: ["string", "null"]
+      required:
+        - date
+        - type
+        - description
+
+    DuoStats:
+      type: object
+      properties:
+        duo:
+          $ref: "#/components/schemas/DuoWithMembers"
+        mainDays:
+          type: integer
+        sideDays:
+          type: integer
+        offDays:
+          type: integer
+        totalDays:
+          type: integer
+      required:
+        - duo
+        - mainDays
+        - sideDays
+        - offDays
+        - totalDays
+
+    ProducerStats:
+      type: object
+      properties:
+        producer:
+          $ref: "#/components/schemas/Producer"
+        weeksResponsible:
+          type: integer
+      required:
+        - producer
+        - weeksResponsible
+
+    ChangeLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        scheduleId:
+          type: ["integer", "null"]
+        date:
+          type: string
+        action:
+          type: string
+        previousState:
+          type: ["string", "null"]
+        newState:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - date
+        - action
+        - createdAt
