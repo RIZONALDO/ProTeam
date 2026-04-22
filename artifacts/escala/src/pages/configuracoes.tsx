@@ -23,7 +23,18 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Building2, Users, KeyRound, ShieldCheck, ImagePlus, X } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Building2,
+  Users,
+  KeyRound,
+  ShieldCheck,
+  ImagePlus,
+  X,
+  ShieldHalf,
+} from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
 
 type AppUser = {
@@ -32,6 +43,12 @@ type AppUser = {
   displayName: string;
   role: string;
   permissions: string;
+};
+
+type AccessProfile = {
+  id: string;
+  name: string;
+  permissions: string[];
 };
 
 const ALL_MENU_ITEMS = [
@@ -56,6 +73,10 @@ function serializePermissions(perms: string[]): string {
   return perms.join(",");
 }
 
+function generateId() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
 export default function Configuracoes() {
   const { user: currentUser } = useAuth();
 
@@ -70,6 +91,9 @@ export default function Configuracoes() {
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
+  const [profiles, setProfiles] = useState<AccessProfile[]>([]);
+  const [savingProfiles, setSavingProfiles] = useState(false);
+
   const [showUserDialog, setShowUserDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [userForm, setUserForm] = useState({
@@ -77,9 +101,14 @@ export default function Configuracoes() {
     displayName: "",
     password: "",
     role: "user",
+    profileId: "",
     permissions: [] as string[],
   });
   const [savingUser, setSavingUser] = useState(false);
+
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<AccessProfile | null>(null);
+  const [profileForm, setProfileForm] = useState({ name: "", permissions: [] as string[] });
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -91,6 +120,13 @@ export default function Configuracoes() {
         setCompanyName(name);
         setCompanyNameInput(name);
         if (data["app_logo"]) setAppLogo(data["app_logo"]);
+        if (data["access_profiles"]) {
+          try {
+            setProfiles(JSON.parse(data["access_profiles"]));
+          } catch {
+            setProfiles([]);
+          }
+        }
       })
       .catch(() => toast.error("Erro ao carregar configurações"))
       .finally(() => setLoadingSettings(false));
@@ -105,6 +141,65 @@ export default function Configuracoes() {
       .then(setUsers)
       .catch(() => toast.error("Erro ao carregar usuários"))
       .finally(() => setLoadingUsers(false));
+  }
+
+  async function saveProfiles(updated: AccessProfile[]) {
+    setSavingProfiles(true);
+    try {
+      const res = await apiFetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_profiles: JSON.stringify(updated) }),
+      });
+      if (!res.ok) throw new Error();
+      setProfiles(updated);
+      toast.success("Perfis salvos!");
+    } catch {
+      toast.error("Erro ao salvar perfis");
+    } finally {
+      setSavingProfiles(false);
+    }
+  }
+
+  function openNewProfile() {
+    setEditingProfile(null);
+    setProfileForm({ name: "", permissions: [] });
+    setShowProfileDialog(true);
+  }
+
+  function openEditProfile(p: AccessProfile) {
+    setEditingProfile(p);
+    setProfileForm({ name: p.name, permissions: [...p.permissions] });
+    setShowProfileDialog(true);
+  }
+
+  async function saveProfile() {
+    if (!profileForm.name.trim()) {
+      toast.error("Informe um nome para o perfil");
+      return;
+    }
+    const updated = editingProfile
+      ? profiles.map((p) =>
+          p.id === editingProfile.id
+            ? { ...p, name: profileForm.name, permissions: profileForm.permissions }
+            : p
+        )
+      : [...profiles, { id: generateId(), name: profileForm.name, permissions: profileForm.permissions }];
+    await saveProfiles(updated);
+    setShowProfileDialog(false);
+  }
+
+  async function deleteProfile(id: string) {
+    await saveProfiles(profiles.filter((p) => p.id !== id));
+  }
+
+  function toggleProfilePerm(path: string) {
+    setProfileForm((f) => ({
+      ...f,
+      permissions: f.permissions.includes(path)
+        ? f.permissions.filter((p) => p !== path)
+        : [...f.permissions, path],
+    }));
   }
 
   function handleLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -161,20 +256,50 @@ export default function Configuracoes() {
 
   function openNewUser() {
     setEditingUser(null);
-    setUserForm({ username: "", displayName: "", password: "", role: "user", permissions: [] });
+    setUserForm({ username: "", displayName: "", password: "", role: "user", profileId: "", permissions: [] });
     setShowUserDialog(true);
   }
 
   function openEditUser(u: AppUser) {
     setEditingUser(u);
+    const perms = parsePermissions(u.permissions);
+    const matchedProfile = profiles.find(
+      (p) =>
+        p.permissions.length === perms.length &&
+        p.permissions.every((x) => perms.includes(x))
+    );
     setUserForm({
       username: u.username,
       displayName: u.displayName,
       password: "",
       role: u.role,
-      permissions: parsePermissions(u.permissions),
+      profileId: matchedProfile ? matchedProfile.id : perms.length > 0 ? "custom" : "",
+      permissions: perms,
     });
     setShowUserDialog(true);
+  }
+
+  function handleProfileSelect(profileId: string) {
+    if (profileId === "custom" || profileId === "") {
+      setUserForm((f) => ({ ...f, profileId, permissions: profileId === "" ? [] : f.permissions }));
+    } else {
+      const profile = profiles.find((p) => p.id === profileId);
+      setUserForm((f) => ({
+        ...f,
+        profileId,
+        permissions: profile ? profile.permissions : [],
+      }));
+    }
+  }
+
+  function toggleUserPermission(path: string) {
+    setUserForm((f) => ({
+      ...f,
+      profileId: "custom",
+      permissions: f.permissions.includes(path)
+        ? f.permissions.filter((p) => p !== path)
+        : [...f.permissions, path],
+    }));
   }
 
   async function saveUser() {
@@ -252,13 +377,12 @@ export default function Configuracoes() {
     }
   }
 
-  function togglePermission(path: string) {
-    setUserForm((f) => ({
-      ...f,
-      permissions: f.permissions.includes(path)
-        ? f.permissions.filter((p) => p !== path)
-        : [...f.permissions, path],
-    }));
+  function permissionSummary(perms: string[]): string {
+    if (perms.length === 0) return "Sem acesso";
+    if (perms.length === ALL_MENU_ITEMS.length) return "Acesso completo";
+    return perms
+      .map((p) => ALL_MENU_ITEMS.find((m) => m.path === p)?.label ?? p)
+      .join(", ");
   }
 
   return (
@@ -274,6 +398,10 @@ export default function Configuracoes() {
             <Building2 className="h-4 w-4 mr-1.5" />
             Geral
           </TabsTrigger>
+          <TabsTrigger value="perfis" className="rounded-lg">
+            <ShieldHalf className="h-4 w-4 mr-1.5" />
+            Perfis de Acesso
+          </TabsTrigger>
           <TabsTrigger value="usuarios" className="rounded-lg">
             <Users className="h-4 w-4 mr-1.5" />
             Usuários
@@ -282,7 +410,6 @@ export default function Configuracoes() {
 
         {/* ── General tab ── */}
         <TabsContent value="geral" className="mt-4 space-y-4">
-          {/* App name */}
           <Card className="rounded-xl max-w-lg">
             <CardHeader>
               <CardTitle className="text-base">Nome do Aplicativo</CardTitle>
@@ -313,7 +440,6 @@ export default function Configuracoes() {
             </CardContent>
           </Card>
 
-          {/* App logo / icon */}
           <Card className="rounded-xl max-w-lg">
             <CardHeader>
               <CardTitle className="text-base">Ícone do Aplicativo</CardTitle>
@@ -326,9 +452,7 @@ export default function Configuracoes() {
                 <Skeleton className="h-20 w-20 rounded-xl" />
               ) : (
                 <>
-                  {/* Preview row */}
                   <div className="flex items-center gap-4">
-                    {/* Current / preview icon */}
                     <div className="relative">
                       {(appLogoPreview ?? appLogo) ? (
                         <img
@@ -376,7 +500,6 @@ export default function Configuracoes() {
                     </div>
                   </div>
 
-                  {/* Confirm / cancel when a new preview is pending */}
                   {appLogoPreview && (
                     <div className="flex gap-2">
                       <Button
@@ -402,6 +525,91 @@ export default function Configuracoes() {
           </Card>
         </TabsContent>
 
+        {/* ── Access Profiles tab ── */}
+        <TabsContent value="perfis" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold">Perfis de Acesso</h2>
+              <p className="text-sm text-muted-foreground">
+                Crie perfis com permissões de menu e atribua-os aos usuários
+              </p>
+            </div>
+            <Button onClick={openNewProfile} size="sm">
+              <Plus className="h-4 w-4 mr-1.5" />
+              Novo perfil
+            </Button>
+          </div>
+
+          {loadingSettings ? (
+            <div className="space-y-2">
+              {[1, 2].map((i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+            </div>
+          ) : profiles.length === 0 ? (
+            <Card className="rounded-xl border-dashed">
+              <CardContent className="py-10 flex flex-col items-center gap-2 text-center">
+                <ShieldHalf className="h-8 w-8 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">Nenhum perfil criado ainda.</p>
+                <p className="text-xs text-muted-foreground">
+                  Crie perfis para facilitar a atribuição de permissões aos usuários.
+                </p>
+                <Button size="sm" variant="outline" className="mt-2" onClick={openNewProfile}>
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Criar primeiro perfil
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {profiles.map((profile) => (
+                <Card key={profile.id} className="rounded-xl">
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <ShieldHalf className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm">{profile.name}</p>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {profile.permissions.length === 0 ? (
+                              <span className="text-xs text-muted-foreground">Sem acesso a nenhuma página</span>
+                            ) : profile.permissions.length === ALL_MENU_ITEMS.length ? (
+                              <Badge variant="secondary" className="text-[10px]">Acesso completo</Badge>
+                            ) : (
+                              profile.permissions.map((path) => {
+                                const item = ALL_MENU_ITEMS.find((m) => m.path === path);
+                                return item ? (
+                                  <Badge key={path} variant="outline" className="text-[10px] px-1.5">
+                                    {item.label}
+                                  </Badge>
+                                ) : null;
+                              })
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditProfile(profile)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => deleteProfile(profile.id)}
+                          disabled={savingProfiles}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
         {/* ── Users tab ── */}
         <TabsContent value="usuarios" className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
@@ -425,6 +633,11 @@ export default function Configuracoes() {
                 const perms = parsePermissions(u.permissions);
                 const isAdmin = u.role === "admin";
                 const isMe = u.id === currentUser?.id;
+                const matchedProfile = profiles.find(
+                  (p) =>
+                    p.permissions.length === perms.length &&
+                    p.permissions.every((x) => perms.includes(x))
+                );
                 return (
                   <Card key={u.id} className="rounded-xl">
                     <CardContent className="py-3 px-4 flex items-center justify-between gap-4">
@@ -442,7 +655,7 @@ export default function Configuracoes() {
                             <span className="text-xs text-muted-foreground font-mono">@{u.username}</span>
                             {isMe && <Badge variant="outline" className="text-[10px] px-1.5">você</Badge>}
                           </div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                             <Badge
                               variant={isAdmin ? "default" : "secondary"}
                               className="text-[10px] px-1.5 py-0"
@@ -450,13 +663,16 @@ export default function Configuracoes() {
                               {isAdmin ? "Administrador" : "Usuário"}
                             </Badge>
                             {!isAdmin && (
-                              <span className="text-[11px] text-muted-foreground">
-                                {perms.length === 0
-                                  ? "Sem acesso"
-                                  : perms.length === ALL_MENU_ITEMS.length
-                                  ? "Acesso completo"
-                                  : `${perms.length} item${perms.length !== 1 ? "s" : ""}`}
-                              </span>
+                              matchedProfile ? (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-primary border-primary/30">
+                                  <ShieldHalf className="h-2.5 w-2.5 mr-0.5" />
+                                  {matchedProfile.name}
+                                </Badge>
+                              ) : (
+                                <span className="text-[11px] text-muted-foreground">
+                                  {permissionSummary(perms)}
+                                </span>
+                              )
                             )}
                           </div>
                         </div>
@@ -484,7 +700,66 @@ export default function Configuracoes() {
         </TabsContent>
       </Tabs>
 
-      {/* User dialog */}
+      {/* ── Profile Dialog ── */}
+      <Dialog open={showProfileDialog} onOpenChange={setShowProfileDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{editingProfile ? "Editar perfil" : "Novo perfil de acesso"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Nome do perfil *</Label>
+              <Input
+                value={profileForm.name}
+                onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="Ex: Editor, Produtor, Visitante..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Itens de menu visíveis</Label>
+              <div className="rounded-xl border p-3 space-y-2.5">
+                {ALL_MENU_ITEMS.map((item) => (
+                  <div key={item.path} className="flex items-center gap-2.5">
+                    <Checkbox
+                      id={`pfperm-${item.path}`}
+                      checked={profileForm.permissions.includes(item.path)}
+                      onCheckedChange={() => toggleProfilePerm(item.path)}
+                    />
+                    <label htmlFor={`pfperm-${item.path}`} className="text-sm cursor-pointer select-none">
+                      {item.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  className="text-xs text-primary hover:underline"
+                  onClick={() => setProfileForm((f) => ({ ...f, permissions: ALL_MENU_ITEMS.map((m) => m.path) }))}
+                >
+                  Selecionar todos
+                </button>
+                <span className="text-xs text-muted-foreground">·</span>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:underline"
+                  onClick={() => setProfileForm((f) => ({ ...f, permissions: [] }))}
+                >
+                  Limpar
+                </button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowProfileDialog(false)}>Cancelar</Button>
+            <Button onClick={saveProfile} disabled={savingProfiles}>
+              {savingProfiles ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── User Dialog ── */}
       <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -515,7 +790,7 @@ export default function Configuracoes() {
                 value={userForm.password}
                 onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
                 placeholder="••••••••"
-                autoComplete={editingUser ? "new-password" : "new-password"}
+                autoComplete="new-password"
               />
               {(!editingUser || userForm.password) && (
                 <div className="space-y-1 pt-1">
@@ -533,7 +808,7 @@ export default function Configuracoes() {
               )}
             </div>
             <div className="space-y-1.5">
-              <Label>Perfil</Label>
+              <Label>Perfil do sistema</Label>
               <Select value={userForm.role} onValueChange={(v) => setUserForm((f) => ({ ...f, role: v }))}>
                 <SelectTrigger>
                   <SelectValue />
@@ -546,21 +821,62 @@ export default function Configuracoes() {
             </div>
 
             {userForm.role === "user" && (
-              <div className="space-y-2">
-                <Label>Itens de menu permitidos</Label>
-                <div className="rounded-xl border p-3 space-y-2">
-                  {ALL_MENU_ITEMS.map((item) => (
-                    <div key={item.path} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`perm-${item.path}`}
-                        checked={userForm.permissions.includes(item.path)}
-                        onCheckedChange={() => togglePermission(item.path)}
-                      />
-                      <label htmlFor={`perm-${item.path}`} className="text-sm cursor-pointer">
-                        {item.label}
-                      </label>
-                    </div>
-                  ))}
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Perfil de acesso</Label>
+                  <Select value={userForm.profileId} onValueChange={handleProfileSelect}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um perfil ou configure manualmente..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {profiles.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="custom">Personalizado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {profiles.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Crie perfis na aba "Perfis de Acesso" para agilizar a configuração.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Itens de menu visíveis</Label>
+                  <div className="rounded-xl border p-3 space-y-2">
+                    {ALL_MENU_ITEMS.map((item) => (
+                      <div key={item.path} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`uperm-${item.path}`}
+                          checked={userForm.permissions.includes(item.path)}
+                          onCheckedChange={() => toggleUserPermission(item.path)}
+                        />
+                        <label htmlFor={`uperm-${item.path}`} className="text-sm cursor-pointer select-none">
+                          {item.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2 pt-0.5">
+                    <button
+                      type="button"
+                      className="text-xs text-primary hover:underline"
+                      onClick={() => setUserForm((f) => ({ ...f, profileId: "custom", permissions: ALL_MENU_ITEMS.map((m) => m.path) }))}
+                    >
+                      Selecionar todos
+                    </button>
+                    <span className="text-xs text-muted-foreground">·</span>
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground hover:underline"
+                      onClick={() => setUserForm((f) => ({ ...f, profileId: "", permissions: [] }))}
+                    >
+                      Limpar
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

@@ -9,12 +9,13 @@ import {
   UserCircle,
   BarChart3,
   Menu,
-  ChevronLeft,
-  ChevronRight,
   Settings,
   LogOut,
   Sun,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Power,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -134,8 +135,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <p className="text-xs text-muted-foreground font-mono">@{user?.username}</p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleLogout}>
-            <LogOut className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={handleLogout} title="Sair">
+            <Power className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -206,15 +207,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <button
               onClick={() => setCollapsed((v) => !v)}
               title={collapsed ? "Expandir menu" : "Recolher menu"}
-              className={`w-full flex items-center py-2.5 rounded-xl text-sm text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors ${
+              className={`w-full flex items-center py-2.5 rounded-xl text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors ${
                 collapsed ? "justify-center px-2" : "px-3 gap-2"
               }`}
             >
               {collapsed ? (
-                <ChevronRight className="h-4 w-4" />
+                <PanelLeftOpen className="h-4 w-4" />
               ) : (
                 <>
-                  <ChevronLeft className="h-4 w-4" />
+                  <PanelLeftClose className="h-4 w-4" />
                   <span>Recolher menu</span>
                 </>
               )}
@@ -238,11 +239,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-sidebar-foreground flex-shrink-0"
+                className="h-8 w-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
                 onClick={handleLogout}
                 title="Sair"
               >
-                <LogOut className="h-4 w-4" />
+                <Power className="h-4 w-4" />
               </Button>
             </div>
           ) : (
@@ -253,9 +254,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <button
                 onClick={handleLogout}
                 title="Sair"
-                className="text-muted-foreground hover:text-sidebar-foreground transition-colors"
+                className="flex items-center justify-center h-8 w-8 rounded-xl text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
               >
-                <LogOut className="h-4 w-4" />
+                <Power className="h-4 w-4" />
               </button>
             </div>
           )}
