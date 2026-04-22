@@ -5,9 +5,9 @@
  * Plataforma de Escala - Content Team Scheduling API
  * OpenAPI spec version: 0.1.0
  */
-import type { Producer } from "./producer";
+import type { Member } from "./member";
 
 export interface ProducerStats {
-  producer: Producer;
+  producer: Member;
   weeksResponsible: number;
 }

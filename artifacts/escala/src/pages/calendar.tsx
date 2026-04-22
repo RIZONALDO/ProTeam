@@ -7,6 +7,8 @@ import {
   useBulkUpdateSchedules,
   useListConflicts,
   getListConflictsQueryKey,
+  useListProducerWeeks,
+  getListProducerWeeksQueryKey,
 } from "@workspace/api-client-react";
 import {
   format,
@@ -14,6 +16,7 @@ import {
   subMonths,
   startOfMonth,
   endOfMonth,
+  startOfWeek,
   eachDayOfInterval,
   isSameMonth,
   isToday,
@@ -32,7 +35,7 @@ import {
   DragEndEvent,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import { ChevronLeft, ChevronRight, AlertTriangle, GripVertical, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -218,6 +221,8 @@ export default function Calendar() {
     { year, month },
     { query: { queryKey: getListConflictsQueryKey({ year, month }) } }
   );
+
+  const { data: producerWeeks } = useListProducerWeeks({ query: { queryKey: getListProducerWeeksQueryKey() } });
 
   const updateSchedules = useBulkUpdateSchedules();
   const queryClient = useQueryClient();
@@ -411,21 +416,55 @@ export default function Calendar() {
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-1">
-              {allDays.map((date, idx) => {
-                if (!date) return <div key={`pad-${idx}`} className="min-h-[110px]" />;
-                const dateStr = format(date, "yyyy-MM-dd");
-                const schedule = getMergedSchedule(dateStr);
+            <div className="space-y-1">
+              {Array.from({ length: Math.ceil(allDays.length / 7) }, (_, weekIdx) => {
+                const weekDays = allDays.slice(weekIdx * 7, weekIdx * 7 + 7);
+                // Calendar rows start on Sunday; Seg (Monday) is index 1
+                const monday = weekDays[1] ?? weekDays.find((d) => d !== null) ?? null;
+                const weekMon = monday ? startOfWeek(monday, { weekStartsOn: 1 }) : null;
+                const weekMonStr = weekMon ? format(weekMon, "yyyy-MM-dd") : null;
+                const pw = weekMonStr ? producerWeeks?.find((p) => p.weekStart === weekMonStr) : null;
+                const producer = pw?.member ?? null;
+
                 return (
-                  <CalendarDay
-                    key={dateStr}
-                    date={date}
-                    schedule={schedule}
-                    isCurrentMonth={isSameMonth(date, currentDate)}
-                    conflictDates={conflictDates}
-                    onDropDuo={handleDropDuo}
-                    onClearSlot={handleClearSlot}
-                  />
+                  <div key={weekIdx}>
+                    {producer && (
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 mb-0.5 bg-primary/5 rounded-md border border-primary/10">
+                        {producer.photoUrl ? (
+                          <img
+                            src={`/api/storage${producer.photoUrl}`}
+                            alt={producer.name}
+                            className="h-4 w-4 rounded-full object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                            <User className="h-2.5 w-2.5 text-primary" />
+                          </div>
+                        )}
+                        <span className="text-[11px] font-semibold text-primary truncate">
+                          Produtor: {producer.name}
+                        </span>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-7 gap-1">
+                      {weekDays.map((date, idx) => {
+                        if (!date) return <div key={`pad-${weekIdx}-${idx}`} className="min-h-[110px]" />;
+                        const dateStr = format(date, "yyyy-MM-dd");
+                        const schedule = getMergedSchedule(dateStr);
+                        return (
+                          <CalendarDay
+                            key={dateStr}
+                            date={date}
+                            schedule={schedule}
+                            isCurrentMonth={isSameMonth(date, currentDate)}
+                            conflictDates={conflictDates}
+                            onDropDuo={handleDropDuo}
+                            onClearSlot={handleClearSlot}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
             </div>

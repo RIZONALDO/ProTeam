@@ -4,7 +4,11 @@ import {
   getListSchedulesQueryKey,
   useListProducerWeeks,
   getListProducerWeeksQueryKey,
+  useCreateProducerWeek,
+  useListMembers,
+  getListMembersQueryKey,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   format,
   addWeeks,
@@ -16,11 +20,19 @@ import {
   isToday,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, UserCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, User, Pencil, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
 
 type DuoInfo = {
   id: number;
@@ -29,8 +41,15 @@ type DuoInfo = {
   members?: { id: number; name: string; role?: string | null }[];
 };
 
+function photoSrc(objectPath: string | null | undefined) {
+  if (!objectPath) return null;
+  return `/api/storage${objectPath}`;
+}
+
 export default function EscalaSemanal() {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [editingProducer, setEditingProducer] = useState(false);
+  const [selectedMemberId, setSelectedMemberId] = useState<string>("");
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -45,9 +64,15 @@ export default function EscalaSemanal() {
   );
 
   const { data: producerWeeks } = useListProducerWeeks({ query: { queryKey: getListProducerWeeksQueryKey() } });
+  const { data: members } = useListMembers({ query: { queryKey: getListMembersQueryKey() } });
+  const createProducerWeek = useCreateProducerWeek();
+  const queryClient = useQueryClient();
+
+  const producers = members?.filter((m) => m.role === "Produtor") ?? [];
 
   const weekStartStr = format(weekStart, "yyyy-MM-dd");
   const currentProducerWeek = producerWeeks?.find((pw) => pw.weekStart === weekStartStr);
+  const currentProducer = currentProducerWeek?.member ?? null;
 
   const scheduleMap = new Map<string, typeof schedules[0]>();
   schedules?.forEach((s) => scheduleMap.set(s.date, s));
@@ -55,6 +80,25 @@ export default function EscalaSemanal() {
   const nextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
   const prevWeek = () => setCurrentDate(subWeeks(currentDate, 1));
   const goToday = () => setCurrentDate(new Date());
+
+  function startEditProducer() {
+    setSelectedMemberId(currentProducer?.id?.toString() ?? "");
+    setEditingProducer(true);
+  }
+
+  async function saveProducer() {
+    const memberId = selectedMemberId ? parseInt(selectedMemberId) : null;
+    try {
+      await createProducerWeek.mutateAsync({
+        data: { weekStart: weekStartStr, memberId },
+      });
+      queryClient.invalidateQueries({ queryKey: getListProducerWeeksQueryKey() });
+      toast.success("Produtor da semana atualizado!");
+    } catch {
+      toast.error("Erro ao atualizar produtor da semana.");
+    }
+    setEditingProducer(false);
+  }
 
   function DuoChip({ duo, variant }: { duo?: DuoInfo | null; variant: "main" | "side" | "off" }) {
     if (!duo) return <span className="text-xs text-muted-foreground italic">-</span>;
@@ -104,19 +148,62 @@ export default function EscalaSemanal() {
         </div>
       </div>
 
-      {currentProducerWeek?.producer && (
-        <Card className="rounded-xl border-l-4 border-l-primary bg-primary/5">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
-              <UserCircle className="h-6 w-6 text-primary" />
+      {/* Producer of the week banner */}
+      <Card className="rounded-xl border-l-4 border-l-primary bg-primary/5">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              {currentProducer?.photoUrl ? (
+                <img
+                  src={photoSrc(currentProducer.photoUrl)!}
+                  alt={currentProducer.name}
+                  className="h-14 w-14 rounded-full object-cover border-2 border-primary/30 flex-shrink-0"
+                />
+              ) : (
+                <div className="h-14 w-14 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 border-2 border-primary/30">
+                  <User className="h-7 w-7 text-primary" />
+                </div>
+              )}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary/70">Produtor Responsável pela Semana</p>
+                {editingProducer ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
+                      <SelectTrigger className="h-8 w-52 text-sm">
+                        <SelectValue placeholder="Selecione o produtor..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Nenhum —</SelectItem>
+                        {producers.map((p) => (
+                          <SelectItem key={p.id} value={p.id.toString()}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700" onClick={saveProducer} disabled={createProducerWeek.isPending}>
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingProducer(false)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="font-bold text-xl mt-0.5">
+                    {currentProducer ? currentProducer.name : <span className="text-muted-foreground font-normal italic text-base">Não atribuído</span>}
+                  </p>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Produtor Responsável pela Semana</p>
-              <p className="font-bold text-lg">{currentProducerWeek.producer.name}</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            {!editingProducer && (
+              <Button variant="outline" size="sm" onClick={startEditProducer} className="flex-shrink-0">
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                Alterar
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
         {days.map((day) => {
@@ -129,7 +216,7 @@ export default function EscalaSemanal() {
               key={dateStr}
               className={`rounded-xl ${today ? "ring-2 ring-primary shadow-md" : "shadow-sm"}`}
             >
-              <CardHeader className="pb-2 pt-4 px-4">
+              <div className="pb-2 pt-4 px-4">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-muted-foreground uppercase">
                     {format(day, "EEE", { locale: ptBR })}
@@ -141,7 +228,7 @@ export default function EscalaSemanal() {
                 <span className={`text-2xl font-bold ${today ? "text-primary" : ""}`}>
                   {format(day, "d")}
                 </span>
-              </CardHeader>
+              </div>
               <CardContent className="px-4 pb-4 space-y-3">
                 {schedule ? (
                   <>

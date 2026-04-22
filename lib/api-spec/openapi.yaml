@@ -1001,11 +1001,11 @@ components:
         weekStart:
           type: string
           description: ISO date of Monday that starts the week (YYYY-MM-DD)
-        producerId:
+        memberId:
           type: ["integer", "null"]
-        producer:
+        member:
           oneOf:
-            - $ref: "#/components/schemas/Producer"
+            - $ref: "#/components/schemas/Member"
             - type: "null"
         createdAt:
           type: string
@@ -1022,7 +1022,7 @@ components:
       properties:
         weekStart:
           type: string
-        producerId:
+        memberId:
           type: ["integer", "null"]
       required:
         - weekStart
@@ -1030,7 +1030,7 @@ components:
     UpdateProducerWeekBody:
       type: object
       properties:
-        producerId:
+        memberId:
           type: ["integer", "null"]
 
     DashboardSummary:
@@ -1042,7 +1042,7 @@ components:
           type: string
         currentProducer:
           oneOf:
-            - $ref: "#/components/schemas/Producer"
+            - $ref: "#/components/schemas/Member"
             - type: "null"
         scheduleCount:
           type: integer
@@ -1124,7 +1124,7 @@ components:
       type: object
       properties:
         producer:
-          $ref: "#/components/schemas/Producer"
+          $ref: "#/components/schemas/Member"
         weeksResponsible:
           type: integer
       required:

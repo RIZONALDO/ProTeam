@@ -382,14 +382,16 @@ export const ListSchedulesResponseItem = zod.object({
         weekStart: zod
           .string()
           .describe("ISO date of Monday that starts the week (YYYY-MM-DD)"),
-        producerId: zod.number().nullish(),
-        producer: zod
+        memberId: zod.number().nullish(),
+        member: zod
           .union([
             zod.object({
               id: zod.number(),
               name: zod.string(),
+              role: zod.string(),
               contact: zod.string().nullish(),
               notes: zod.string().nullish(),
+              photoUrl: zod.string().nullish(),
               createdAt: zod.string(),
               updatedAt: zod.string(),
             }),
@@ -514,14 +516,16 @@ export const GetScheduleResponse = zod.object({
         weekStart: zod
           .string()
           .describe("ISO date of Monday that starts the week (YYYY-MM-DD)"),
-        producerId: zod.number().nullish(),
-        producer: zod
+        memberId: zod.number().nullish(),
+        member: zod
           .union([
             zod.object({
               id: zod.number(),
               name: zod.string(),
+              role: zod.string(),
               contact: zod.string().nullish(),
               notes: zod.string().nullish(),
+              photoUrl: zod.string().nullish(),
               createdAt: zod.string(),
               updatedAt: zod.string(),
             }),
@@ -641,14 +645,16 @@ export const UpdateScheduleResponse = zod.object({
         weekStart: zod
           .string()
           .describe("ISO date of Monday that starts the week (YYYY-MM-DD)"),
-        producerId: zod.number().nullish(),
-        producer: zod
+        memberId: zod.number().nullish(),
+        member: zod
           .union([
             zod.object({
               id: zod.number(),
               name: zod.string(),
+              role: zod.string(),
               contact: zod.string().nullish(),
               notes: zod.string().nullish(),
+              photoUrl: zod.string().nullish(),
               createdAt: zod.string(),
               updatedAt: zod.string(),
             }),
@@ -768,14 +774,16 @@ export const GetScheduleByDateResponse = zod.object({
         weekStart: zod
           .string()
           .describe("ISO date of Monday that starts the week (YYYY-MM-DD)"),
-        producerId: zod.number().nullish(),
-        producer: zod
+        memberId: zod.number().nullish(),
+        member: zod
           .union([
             zod.object({
               id: zod.number(),
               name: zod.string(),
+              role: zod.string(),
               contact: zod.string().nullish(),
               notes: zod.string().nullish(),
+              photoUrl: zod.string().nullish(),
               createdAt: zod.string(),
               updatedAt: zod.string(),
             }),
@@ -896,14 +904,16 @@ export const BulkUpdateSchedulesResponseItem = zod.object({
         weekStart: zod
           .string()
           .describe("ISO date of Monday that starts the week (YYYY-MM-DD)"),
-        producerId: zod.number().nullish(),
-        producer: zod
+        memberId: zod.number().nullish(),
+        member: zod
           .union([
             zod.object({
               id: zod.number(),
               name: zod.string(),
+              role: zod.string(),
               contact: zod.string().nullish(),
               notes: zod.string().nullish(),
+              photoUrl: zod.string().nullish(),
               createdAt: zod.string(),
               updatedAt: zod.string(),
             }),
@@ -936,14 +946,16 @@ export const ListProducerWeeksResponseItem = zod.object({
   weekStart: zod
     .string()
     .describe("ISO date of Monday that starts the week (YYYY-MM-DD)"),
-  producerId: zod.number().nullish(),
-  producer: zod
+  memberId: zod.number().nullish(),
+  member: zod
     .union([
       zod.object({
         id: zod.number(),
         name: zod.string(),
+        role: zod.string(),
         contact: zod.string().nullish(),
         notes: zod.string().nullish(),
+        photoUrl: zod.string().nullish(),
         createdAt: zod.string(),
         updatedAt: zod.string(),
       }),
@@ -962,7 +974,7 @@ export const ListProducerWeeksResponse = zod.array(
  */
 export const CreateProducerWeekBody = zod.object({
   weekStart: zod.string(),
-  producerId: zod.number().nullish(),
+  memberId: zod.number().nullish(),
 });
 
 /**
@@ -973,7 +985,7 @@ export const UpdateProducerWeekParams = zod.object({
 });
 
 export const UpdateProducerWeekBody = zod.object({
-  producerId: zod.number().nullish(),
+  memberId: zod.number().nullish(),
 });
 
 export const UpdateProducerWeekResponse = zod.object({
@@ -981,14 +993,16 @@ export const UpdateProducerWeekResponse = zod.object({
   weekStart: zod
     .string()
     .describe("ISO date of Monday that starts the week (YYYY-MM-DD)"),
-  producerId: zod.number().nullish(),
-  producer: zod
+  memberId: zod.number().nullish(),
+  member: zod
     .union([
       zod.object({
         id: zod.number(),
         name: zod.string(),
+        role: zod.string(),
         contact: zod.string().nullish(),
         notes: zod.string().nullish(),
+        photoUrl: zod.string().nullish(),
         createdAt: zod.string(),
         updatedAt: zod.string(),
       }),
@@ -1021,8 +1035,10 @@ export const GetDashboardSummaryResponse = zod.object({
       zod.object({
         id: zod.number(),
         name: zod.string(),
+        role: zod.string(),
         contact: zod.string().nullish(),
         notes: zod.string().nullish(),
+        photoUrl: zod.string().nullish(),
         createdAt: zod.string(),
         updatedAt: zod.string(),
       }),
@@ -1148,14 +1164,16 @@ export const GetDashboardSummaryResponse = zod.object({
             weekStart: zod
               .string()
               .describe("ISO date of Monday that starts the week (YYYY-MM-DD)"),
-            producerId: zod.number().nullish(),
-            producer: zod
+            memberId: zod.number().nullish(),
+            member: zod
               .union([
                 zod.object({
                   id: zod.number(),
                   name: zod.string(),
+                  role: zod.string(),
                   contact: zod.string().nullish(),
                   notes: zod.string().nullish(),
+                  photoUrl: zod.string().nullish(),
                   createdAt: zod.string(),
                   updatedAt: zod.string(),
                 }),
@@ -1243,8 +1261,10 @@ export const GetProducerStatsResponseItem = zod.object({
   producer: zod.object({
     id: zod.number(),
     name: zod.string(),
+    role: zod.string(),
     contact: zod.string().nullish(),
     notes: zod.string().nullish(),
+    photoUrl: zod.string().nullish(),
     createdAt: zod.string(),
     updatedAt: zod.string(),
   }),

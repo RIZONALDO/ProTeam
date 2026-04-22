@@ -8,5 +8,5 @@
 
 export interface UpdateProducerWeekBody {
   /** @nullable */
-  producerId?: number | null;
+  memberId?: number | null;
 }

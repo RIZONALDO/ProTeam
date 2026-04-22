@@ -5,15 +5,15 @@
  * Plataforma de Escala - Content Team Scheduling API
  * OpenAPI spec version: 0.1.0
  */
-import type { Producer } from "./producer";
+import type { Member } from "./member";
 
 export interface ProducerWeek {
   id: number;
   /** ISO date of Monday that starts the week (YYYY-MM-DD) */
   weekStart: string;
   /** @nullable */
-  producerId?: number | null;
-  producer?: Producer | null;
+  memberId?: number | null;
+  member?: Member | null;
   createdAt: string;
   updatedAt: string;
 }

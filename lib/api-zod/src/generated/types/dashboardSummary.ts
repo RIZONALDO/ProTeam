@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { DuoWeekSummary } from "./duoWeekSummary";
-import type { Producer } from "./producer";
+import type { Member } from "./member";
 import type { ScheduleWithRelations } from "./scheduleWithRelations";
 
 export interface DashboardSummary {
   weekStart: string;
   weekEnd: string;
-  currentProducer?: Producer | null;
+  currentProducer?: Member | null;
   scheduleCount: number;
   conflictsCount: number;
   duoSummary: DuoWeekSummary[];

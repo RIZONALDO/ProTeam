@@ -2,7 +2,7 @@ import { pgTable, text, serial, timestamp, integer, date } from "drizzle-orm/pg-
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { duosTable } from "./duos";
-import { producersTable } from "./producers";
+import { membersTable } from "./members";
 
 export const schedulesTable = pgTable("schedules", {
   id: serial("id").primaryKey(),
@@ -18,7 +18,7 @@ export const schedulesTable = pgTable("schedules", {
 export const producerWeeksTable = pgTable("producer_weeks", {
   id: serial("id").primaryKey(),
   weekStart: date("week_start").notNull().unique(),
-  producerId: integer("producer_id").references(() => producersTable.id, { onDelete: "set null" }),
+  memberId: integer("member_id").references(() => membersTable.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

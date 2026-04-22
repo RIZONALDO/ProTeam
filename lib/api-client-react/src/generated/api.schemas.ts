@@ -134,8 +134,8 @@ export interface ProducerWeek {
   /** ISO date of Monday that starts the week (YYYY-MM-DD) */
   weekStart: string;
   /** @nullable */
-  producerId?: number | null;
-  producer?: Producer | null;
+  memberId?: number | null;
+  member?: Member | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -189,12 +189,12 @@ export interface BulkUpdateSchedulesBody {
 export interface CreateProducerWeekBody {
   weekStart: string;
   /** @nullable */
-  producerId?: number | null;
+  memberId?: number | null;
 }
 
 export interface UpdateProducerWeekBody {
   /** @nullable */
-  producerId?: number | null;
+  memberId?: number | null;
 }
 
 export interface DuoWeekSummary {
@@ -207,7 +207,7 @@ export interface DuoWeekSummary {
 export interface DashboardSummary {
   weekStart: string;
   weekEnd: string;
-  currentProducer?: Producer | null;
+  currentProducer?: Member | null;
   scheduleCount: number;
   conflictsCount: number;
   duoSummary: DuoWeekSummary[];
@@ -234,7 +234,7 @@ export interface DuoStats {
 }
 
 export interface ProducerStats {
-  producer: Producer;
+  producer: Member;
   weeksResponsible: number;
 }
 

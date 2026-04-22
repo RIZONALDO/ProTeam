@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, gte, lte } from "drizzle-orm";
-import { db, schedulesTable, producerWeeksTable, producersTable, duosTable, changeLogsTable } from "@workspace/db";
+import { db, schedulesTable, producerWeeksTable, membersTable, duosTable, changeLogsTable } from "@workspace/db";
 import {
   GetDashboardSummaryQueryParams,
   ListConflictsQueryParams,
@@ -43,15 +43,15 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
   const weekStartStr = weekStart.toISOString().split("T")[0];
   const weekEndStr = weekEnd.toISOString().split("T")[0];
 
-  // Get producer for this week
+  // Get producer member for this week
   const [producerWeekRow] = await db.select().from(producerWeeksTable)
     .where(eq(producerWeeksTable.weekStart, weekStartStr));
 
   let currentProducer: Record<string, unknown> | null = null;
-  if (producerWeekRow?.producerId) {
-    const [producer] = await db.select().from(producersTable)
-      .where(eq(producersTable.id, producerWeekRow.producerId));
-    currentProducer = producer ? formatRow(producer) : null;
+  if (producerWeekRow?.memberId) {
+    const [member] = await db.select().from(membersTable)
+      .where(eq(membersTable.id, producerWeekRow.memberId));
+    currentProducer = member ? formatRow(member) : null;
   }
 
   // Get schedules for this week
@@ -59,13 +59,8 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
     .where(and(gte(schedulesTable.date, weekStartStr), lte(schedulesTable.date, weekEndStr)))
     .orderBy(schedulesTable.date);
 
-  // Get upcoming days with relations
   const upcomingDays = await Promise.all(weekSchedules.map(buildScheduleWithRelations));
-
-  // Conflicts for this week
   const conflicts = detectConflicts(weekSchedules);
-
-  // Duo summary
   const allDuos = await getAllDuosWithMembers();
   const duoSummary = allDuos.map((duo) => {
     const mainDays = weekSchedules.filter((s) => s.mainDuoId === duo.id).length;
@@ -77,7 +72,7 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
   res.json(GetDashboardSummaryResponse.parse({
     weekStart: weekStartStr,
     weekEnd: weekEndStr,
-    currentProducer: currentProducer,
+    currentProducer,
     scheduleCount: weekSchedules.length,
     conflictsCount: conflicts.length,
     duoSummary,
@@ -159,10 +154,11 @@ router.get("/reports/producer-stats", async (req, res): Promise<void> => {
       .where(and(gte(producerWeeksTable.weekStart, `${year}-01-01`), lte(producerWeeksTable.weekStart, `${year}-12-31`)));
   }
 
-  const allProducers = await db.select().from(producersTable);
-  const stats = allProducers.map((producer) => {
-    const weeksResponsible = producerWeeks.filter((pw) => pw.producerId === producer.id).length;
-    return { producer: formatRow(producer), weeksResponsible };
+  // Use members with role Produtor
+  const allProducers = await db.select().from(membersTable).where(eq(membersTable.role, "Produtor"));
+  const stats = allProducers.map((member) => {
+    const weeksResponsible = producerWeeks.filter((pw) => pw.memberId === member.id).length;
+    return { producer: formatRow(member), weeksResponsible };
   });
 
   res.json(GetProducerStatsResponse.parse(stats));

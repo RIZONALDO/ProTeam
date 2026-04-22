@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, gte, lte } from "drizzle-orm";
-import { db, schedulesTable, producerWeeksTable, producersTable, changeLogsTable } from "@workspace/db";
+import { db, schedulesTable, producerWeeksTable, membersTable, changeLogsTable } from "@workspace/db";
 import {
   CreateScheduleBody,
   UpdateScheduleBody,
@@ -27,6 +27,13 @@ import { buildScheduleWithRelations, getMonthDateRange } from "../lib/scheduleHe
 import { formatRow, formatRows } from "../lib/formatters";
 
 const router: IRouter = Router();
+
+async function buildProducerWeekWithMember(pw: typeof producerWeeksTable.$inferSelect) {
+  const member = pw.memberId
+    ? (await db.select().from(membersTable).where(eq(membersTable.id, pw.memberId)))[0] ?? null
+    : null;
+  return formatRow({ ...pw, member: member ? formatRow(member) : null });
+}
 
 // Schedules
 router.get("/schedules", async (req, res): Promise<void> => {
@@ -63,7 +70,6 @@ router.post("/schedules", async (req, res): Promise<void> => {
     return;
   }
 
-  // Check for existing schedule on that date
   const [existing] = await db.select().from(schedulesTable).where(eq(schedulesTable.date, parsed.data.date));
   if (existing) {
     res.status(409).json({ error: "Schedule already exists for this date" });
@@ -82,43 +88,31 @@ router.post("/schedules/bulk-update", async (req, res): Promise<void> => {
     return;
   }
 
-  const results = await Promise.all(
-    parsed.data.schedules.map(async (scheduleData) => {
-      const [existing] = await db.select().from(schedulesTable).where(eq(schedulesTable.date, scheduleData.date));
-
-      let schedule;
-      if (existing) {
-        await db.insert(changeLogsTable).values({
-          scheduleId: existing.id,
-          date: scheduleData.date,
-          action: "update",
-          previousState: JSON.stringify({ mainDuoId: existing.mainDuoId, sideDuoId: existing.sideDuoId, offDuoId: existing.offDuoId }),
-          newState: JSON.stringify({ mainDuoId: scheduleData.mainDuoId, sideDuoId: scheduleData.sideDuoId, offDuoId: scheduleData.offDuoId }),
-        });
-        const [updated] = await db.update(schedulesTable)
-          .set({ ...scheduleData, updatedAt: new Date() })
-          .where(eq(schedulesTable.id, existing.id))
-          .returning();
-        schedule = updated;
-      } else {
-        await db.insert(changeLogsTable).values({
-          date: scheduleData.date,
-          action: "create",
-          previousState: null,
-          newState: JSON.stringify({ mainDuoId: scheduleData.mainDuoId, sideDuoId: scheduleData.sideDuoId, offDuoId: scheduleData.offDuoId }),
-        });
-        const [created] = await db.insert(schedulesTable).values(scheduleData).returning();
-        schedule = created;
-      }
-
-      return buildScheduleWithRelations(schedule);
-    })
-  );
+  const results = await Promise.all(parsed.data.schedules.map(async (s) => {
+    const [existing] = await db.select().from(schedulesTable).where(eq(schedulesTable.date, s.date));
+    if (existing) {
+      await db.insert(changeLogsTable).values({
+        scheduleId: existing.id,
+        date: existing.date,
+        action: "bulk-update",
+        previousState: JSON.stringify({ mainDuoId: existing.mainDuoId, sideDuoId: existing.sideDuoId, offDuoId: existing.offDuoId }),
+        newState: JSON.stringify(s),
+      });
+      const [updated] = await db.update(schedulesTable)
+        .set({ ...s, updatedAt: new Date() })
+        .where(eq(schedulesTable.id, existing.id))
+        .returning();
+      return buildScheduleWithRelations(updated);
+    } else {
+      const [created] = await db.insert(schedulesTable).values(s).returning();
+      return buildScheduleWithRelations(created);
+    }
+  }));
 
   res.json(BulkUpdateSchedulesResponse.parse(results));
 });
 
-router.get("/schedules/date/:date", async (req, res): Promise<void> => {
+router.get("/schedules/by-date/:date", async (req, res): Promise<void> => {
   const params = GetScheduleByDateParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -206,14 +200,8 @@ router.get("/producer-weeks", async (req, res): Promise<void> => {
   }
 
   const rows = await db.select().from(producerWeeksTable).orderBy(producerWeeksTable.weekStart);
-  const withProducers = await Promise.all(rows.map(async (pw) => {
-    const producer = pw.producerId
-      ? (await db.select().from(producersTable).where(eq(producersTable.id, pw.producerId)))[0] ?? null
-      : null;
-    return formatRow({ ...pw, producer: producer ? formatRow(producer) : null });
-  }));
-
-  res.json(ListProducerWeeksResponse.parse(withProducers));
+  const withMembers = await Promise.all(rows.map(buildProducerWeekWithMember));
+  res.json(ListProducerWeeksResponse.parse(withMembers));
 });
 
 router.post("/producer-weeks", async (req, res): Promise<void> => {
@@ -227,7 +215,7 @@ router.post("/producer-weeks", async (req, res): Promise<void> => {
   let pw;
   if (existing) {
     const [updated] = await db.update(producerWeeksTable)
-      .set({ producerId: parsed.data.producerId ?? null, updatedAt: new Date() })
+      .set({ memberId: parsed.data.memberId ?? null, updatedAt: new Date() })
       .where(eq(producerWeeksTable.id, existing.id))
       .returning();
     pw = updated;
@@ -236,11 +224,8 @@ router.post("/producer-weeks", async (req, res): Promise<void> => {
     pw = created;
   }
 
-  const producer = pw.producerId
-    ? (await db.select().from(producersTable).where(eq(producersTable.id, pw.producerId)))[0] ?? null
-    : null;
-
-  res.status(201).json(formatRow({ ...pw, producer: producer ? formatRow(producer) : null }));
+  const result = await buildProducerWeekWithMember(pw);
+  res.status(201).json(result);
 });
 
 router.patch("/producer-weeks/:id", async (req, res): Promise<void> => {
@@ -265,11 +250,8 @@ router.patch("/producer-weeks/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const producer = pw.producerId
-    ? (await db.select().from(producersTable).where(eq(producersTable.id, pw.producerId)))[0] ?? null
-    : null;
-
-  res.json(UpdateProducerWeekResponse.parse(formatRow({ ...pw, producer: producer ? formatRow(producer) : null })));
+  const result = await buildProducerWeekWithMember(pw);
+  res.json(UpdateProducerWeekResponse.parse(result));
 });
 
 router.delete("/producer-weeks/:id", async (req, res): Promise<void> => {

@@ -9,5 +9,5 @@
 export interface CreateProducerWeekBody {
   weekStart: string;
   /** @nullable */
-  producerId?: number | null;
+  memberId?: number | null;
 }
