@@ -336,7 +336,13 @@ function CalendarDay({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div className="flex items-center justify-between mb-1">
+      {/* Cabeçalho clicável — abre detalhes do dia */}
+      <div
+        className={`flex items-center justify-between rounded px-0.5 -mx-0.5 mb-1 pb-1
+          border-b border-border/40 group-hover:border-primary/30
+          group-hover:bg-primary/5 transition-all duration-150 cursor-pointer`}
+        title="Clique para ver detalhes do dia"
+      >
         <span
           className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full
             ${today ? "bg-primary text-primary-foreground" : "text-foreground"}`}
@@ -387,11 +393,15 @@ function CalendarDay({
               <Users className="h-3 w-3" />
             </button>
           )}
+          {/* Indicador "abrir" — aparece no hover em desktop */}
+          <ChevronRight
+            className="h-3 w-3 text-primary/50 hidden md:block opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+          />
         </div>
       </div>
 
       {isCurrentMonth && (
-        <div className="flex flex-col gap-0.5 flex-1">
+        <div className="flex flex-col gap-0.5 flex-1" onClick={(e) => e.stopPropagation()}>
           <DroppableSlot
             slotId={`${dateStr}:main`}
             duo={schedule?.mainDuo}
