@@ -1205,9 +1205,10 @@ export const ListConflictsResponseItem = zod.object({
   type: zod
     .string()
     .describe(
-      "Type of conflict: side_no_rest, duplicate_assignment, missing_duo",
+      "Type of conflict: side_no_rest, duplicate_assignment, missing_duo, incomplete_day, main_consecutive, imbalance, no_weekly_off",
     ),
   description: zod.string(),
+  severity: zod.enum(["error", "warning"]).optional().default("error"),
   duoId: zod.number().nullish(),
   duoName: zod.string().nullish(),
 });

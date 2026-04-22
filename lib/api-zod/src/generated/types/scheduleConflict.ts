@@ -8,9 +8,10 @@
 
 export interface ScheduleConflict {
   date: string;
-  /** Type of conflict: side_no_rest, duplicate_assignment, missing_duo */
+  /** Type of conflict: side_no_rest, duplicate_assignment, missing_duo, incomplete_day, main_consecutive, imbalance, no_weekly_off */
   type: string;
   description: string;
+  severity?: "error" | "warning";
   /** @nullable */
   duoId?: number | null;
   /** @nullable */

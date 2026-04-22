@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   useListSchedules,
   getListSchedulesQueryKey,
@@ -35,7 +35,7 @@ import {
   DragEndEvent,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import { ChevronLeft, ChevronRight, AlertTriangle, X, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, AlertCircle, X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +63,78 @@ type DaySchedule = {
 };
 
 type SlotId = `${string}:${"main" | "side" | "off"}`;
+
+type LiveConflict = {
+  date: string;
+  type: string;
+  description: string;
+  severity: "error" | "warning";
+  duoId: number | null;
+  duoName: string | null;
+};
+
+function detectLiveConflicts(
+  schedules: Array<{ date: string; mainDuoId?: number | null; sideDuoId?: number | null; offDuoId?: number | null }>,
+  duoMap: Map<number, string>
+): LiveConflict[] {
+  const result: LiveConflict[] = [];
+  const sorted = [...schedules].sort((a, b) => a.date.localeCompare(b.date));
+
+  for (let i = 0; i < sorted.length; i++) {
+    const s = sorted[i];
+    const assigned = [s.mainDuoId, s.sideDuoId, s.offDuoId].filter((id): id is number => id != null);
+    const unique = new Set(assigned);
+
+    if (assigned.length > unique.size) {
+      result.push({ date: s.date, type: "duplicate_assignment", description: "Mesma dupla em mais de um papel", severity: "error", duoId: null, duoName: null });
+    }
+    if (assigned.length > 0 && assigned.length < 3) {
+      const missing = [!s.mainDuoId && "principal", !s.sideDuoId && "lateral", !s.offDuoId && "folga"].filter(Boolean).join(" e ");
+      result.push({ date: s.date, type: "incomplete_day", description: `Dia incompleto — sem ${missing}`, severity: "warning", duoId: null, duoName: null });
+    }
+    if (s.sideDuoId && i > 0) {
+      const prev = sorted[i - 1];
+      const diff = Math.round((new Date(s.date + "T00:00:00Z").getTime() - new Date(prev.date + "T00:00:00Z").getTime()) / 86400000);
+      if (diff === 1 && prev.sideDuoId === s.sideDuoId) {
+        result.push({ date: s.date, type: "side_no_rest", description: "Dupla lateral sem descanso", severity: "error", duoId: s.sideDuoId, duoName: duoMap.get(s.sideDuoId) ?? null });
+      }
+    }
+    if (s.mainDuoId && i > 0) {
+      const prev = sorted[i - 1];
+      const diff = Math.round((new Date(s.date + "T00:00:00Z").getTime() - new Date(prev.date + "T00:00:00Z").getTime()) / 86400000);
+      if (diff === 1 && prev.mainDuoId === s.mainDuoId) {
+        result.push({ date: s.date, type: "main_consecutive", description: "Dupla principal repetida em dias seguidos", severity: "warning", duoId: s.mainDuoId, duoName: duoMap.get(s.mainDuoId) ?? null });
+      }
+    }
+  }
+
+  // workload imbalance
+  if (sorted.length >= 5) {
+    const work = new Map<number, number>();
+    for (const s of sorted) {
+      if (s.mainDuoId) work.set(s.mainDuoId, (work.get(s.mainDuoId) ?? 0) + 1);
+      if (s.sideDuoId) work.set(s.sideDuoId, (work.get(s.sideDuoId) ?? 0) + 1);
+    }
+    const entries = Array.from(work.entries());
+    if (entries.length >= 2) {
+      const maxE = entries.reduce((a, b) => a[1] >= b[1] ? a : b);
+      const minE = entries.reduce((a, b) => a[1] <= b[1] ? a : b);
+      const diff = maxE[1] - minE[1];
+      if (diff >= 3) {
+        result.push({
+          date: sorted[sorted.length - 1].date,
+          type: "imbalance",
+          description: `"${duoMap.get(maxE[0]) ?? `Dupla ${maxE[0]}`}" trabalha ${diff} dias a mais que "${duoMap.get(minE[0]) ?? `Dupla ${minE[0]}`}"`,
+          severity: "warning",
+          duoId: maxE[0],
+          duoName: duoMap.get(maxE[0]) ?? null,
+        });
+      }
+    }
+  }
+
+  return result;
+}
 
 function DraggableDuo({ duo, context }: { duo: Duo; context: string }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -132,27 +204,27 @@ function CalendarDay({
   date,
   schedule,
   isCurrentMonth,
-  conflictDates,
+  dayAlerts,
   onDropDuo,
   onClearSlot,
 }: {
   date: Date;
   schedule?: DaySchedule;
   isCurrentMonth: boolean;
-  conflictDates: Set<string>;
+  dayAlerts: Map<string, "error" | "warning">;
   onDropDuo: (date: string, role: "main" | "side" | "off", duoId: number) => void;
   onClearSlot: (date: string, role: "main" | "side" | "off") => void;
 }) {
   const dateStr = format(date, "yyyy-MM-dd");
   const today = isToday(date);
-  const hasConflict = conflictDates.has(dateStr);
+  const alertSeverity = dayAlerts.get(dateStr);
 
   return (
     <div
       className={`group relative flex flex-col p-1.5 border rounded-lg min-h-[110px] transition-colors
         ${!isCurrentMonth ? "opacity-30 bg-muted/20" : "bg-card hover:bg-muted/10"}
         ${today ? "ring-2 ring-primary" : ""}
-        ${hasConflict ? "border-destructive/50" : "border-border"}
+        ${alertSeverity === "error" ? "border-destructive/60" : alertSeverity === "warning" ? "border-amber-400/60" : "border-border"}
       `}
     >
       <div className="flex items-center justify-between mb-1">
@@ -162,12 +234,20 @@ function CalendarDay({
         >
           {format(date, "d")}
         </span>
-        {hasConflict && (
+        {alertSeverity === "error" && (
           <Tooltip>
             <TooltipTrigger>
-              <AlertTriangle className="h-3 w-3 text-destructive" />
+              <AlertCircle className="h-3 w-3 text-destructive" />
             </TooltipTrigger>
-            <TooltipContent>Conflito detectado neste dia</TooltipContent>
+            <TooltipContent>Erro de regra neste dia</TooltipContent>
+          </Tooltip>
+        )}
+        {alertSeverity === "warning" && (
+          <Tooltip>
+            <TooltipTrigger>
+              <AlertTriangle className="h-3 w-3 text-amber-500" />
+            </TooltipTrigger>
+            <TooltipContent>Aviso neste dia</TooltipContent>
           </Tooltip>
         )}
       </div>
@@ -251,7 +331,33 @@ export default function Calendar() {
   const scheduleMap = new Map<string, DaySchedule>();
   schedules?.forEach((s) => scheduleMap.set(s.date, s as DaySchedule));
 
-  const conflictDates = new Set<string>(conflicts?.map((c) => c.date) ?? []);
+  // Build duoMap for live detection
+  const duoMap = useMemo(() => {
+    const m = new Map<number, string>();
+    duos?.forEach((d) => m.set(d.id, d.name));
+    return m;
+  }, [duos]);
+
+  // Live conflicts computed from merged schedules (immediate feedback while dragging)
+  const liveConflicts = useMemo(() => {
+    const allDays = days.map((date) => {
+      const dateStr = format(date, "yyyy-MM-dd");
+      const s = getMergedSchedule(dateStr);
+      return { date: dateStr, mainDuoId: s?.mainDuoId ?? null, sideDuoId: s?.sideDuoId ?? null, offDuoId: s?.offDuoId ?? null };
+    }).filter((s) => s.mainDuoId || s.sideDuoId || s.offDuoId);
+    return detectLiveConflicts(allDays, duoMap);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localSchedules, schedules, duoMap]);
+
+  // Map date -> highest severity for CalendarDay indicators
+  const dayAlerts = useMemo(() => {
+    const m = new Map<string, "error" | "warning">();
+    for (const c of liveConflicts) {
+      const prev = m.get(c.date);
+      if (!prev || c.severity === "error") m.set(c.date, c.severity);
+    }
+    return m;
+  }, [liveConflicts]);
 
   function getMergedSchedule(dateStr: string): DaySchedule | undefined {
     const api = scheduleMap.get(dateStr);
@@ -457,7 +563,7 @@ export default function Calendar() {
                             date={date}
                             schedule={schedule}
                             isCurrentMonth={isSameMonth(date, currentDate)}
-                            conflictDates={conflictDates}
+                            dayAlerts={dayAlerts}
                             onDropDuo={handleDropDuo}
                             onClearSlot={handleClearSlot}
                           />
@@ -483,23 +589,51 @@ export default function Calendar() {
               </CardContent>
             </Card>
 
-            {conflicts && conflicts.length > 0 && (
-              <Card className="mt-3 border-destructive/50 bg-destructive/5 rounded-xl">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm text-destructive flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    Conflitos ({conflicts.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1 pt-0">
-                  {conflicts.slice(0, 5).map((c, i) => (
-                    <div key={i} className="text-xs text-destructive">
-                      {c.date}: {c.message}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
+            {liveConflicts.length > 0 && (() => {
+              const errors = liveConflicts.filter((c) => c.severity === "error");
+              const warnings = liveConflicts.filter((c) => c.severity === "warning");
+              return (
+                <div className="mt-3 space-y-2">
+                  {errors.length > 0 && (
+                    <Card className="border-destructive/50 bg-destructive/5 rounded-xl">
+                      <CardHeader className="pb-2 pt-3 px-3">
+                        <CardTitle className="text-xs text-destructive flex items-center gap-1.5">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          Erros ({errors.length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-1.5 pt-0 px-3 pb-3">
+                        {errors.map((c, i) => (
+                          <div key={i} className="text-xs">
+                            <span className="font-semibold text-destructive">{c.date.slice(8)}:</span>{" "}
+                            <span className="text-destructive/80">{c.description}</span>
+                            {c.duoName && <span className="ml-1 font-medium text-destructive">({c.duoName})</span>}
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )}
+                  {warnings.length > 0 && (
+                    <Card className="border-amber-400/40 bg-amber-50/60 dark:bg-amber-950/20 rounded-xl">
+                      <CardHeader className="pb-2 pt-3 px-3">
+                        <CardTitle className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          Avisos ({warnings.length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-1.5 pt-0 px-3 pb-3">
+                        {warnings.map((c, i) => (
+                          <div key={i} className="text-xs">
+                            <span className="font-semibold text-amber-600 dark:text-amber-400">{c.type === "imbalance" ? "Mês" : c.date.slice(8)}:</span>{" "}
+                            <span className="text-amber-700 dark:text-amber-300">{c.description}</span>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
