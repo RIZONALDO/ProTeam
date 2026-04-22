@@ -11,7 +11,6 @@ import EscalaSemanal from "@/pages/escala-semanal";
 import EscalaMensal from "@/pages/escala-mensal";
 import Duplas from "@/pages/duplas";
 import Membros from "@/pages/membros";
-import Produtores from "@/pages/produtores";
 import Relatorios from "@/pages/relatorios";
 
 const queryClient = new QueryClient({
@@ -34,7 +33,6 @@ function Router() {
         <Route path="/escala-mensal" component={EscalaMensal} />
         <Route path="/duplas" component={Duplas} />
         <Route path="/membros" component={Membros} />
-        <Route path="/produtores" component={Produtores} />
         <Route path="/relatorios" component={Relatorios} />
         <Route component={NotFound} />
       </Switch>

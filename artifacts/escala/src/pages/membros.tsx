@@ -15,6 +15,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -51,11 +58,11 @@ const defaultForm = (): MemberForm => ({
   photoUrl: null,
 });
 
+const MEMBER_ROLES = ["Creator", "Produtor"] as const;
+type MemberRole = typeof MEMBER_ROLES[number];
+
 const ROLE_COLORS: Record<string, string> = {
-  "Apresentadora": "bg-purple-100 text-purple-700 border-purple-200",
-  "Apresentador": "bg-purple-100 text-purple-700 border-purple-200",
-  "Cinegrafista": "bg-blue-100 text-blue-700 border-blue-200",
-  "Editor": "bg-green-100 text-green-700 border-green-200",
+  "Creator": "bg-purple-100 text-purple-700 border-purple-200",
   "Produtor": "bg-amber-100 text-amber-700 border-amber-200",
 };
 
@@ -385,13 +392,20 @@ export default function Membros() {
               />
             </div>
             <div>
-              <Label htmlFor="role">Função</Label>
-              <Input
-                id="role"
+              <Label htmlFor="role">Tipo</Label>
+              <Select
                 value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
-                placeholder="Ex: Apresentadora, Cinegrafista..."
-              />
+                onValueChange={(v) => setForm({ ...form, role: v })}
+              >
+                <SelectTrigger id="role">
+                  <SelectValue placeholder="Selecione o tipo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {MEMBER_ROLES.map((r) => (
+                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="contact">Contato</Label>
