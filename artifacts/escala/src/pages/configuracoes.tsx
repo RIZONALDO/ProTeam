@@ -580,7 +580,7 @@ export default function Configuracoes() {
                               profile.permissions.map((path) => {
                                 const item = ALL_MENU_ITEMS.find((m) => m.path === path);
                                 return item ? (
-                                  <Badge key={path} variant="outline" className="text-[10px] px-1.5">
+                                  <Badge key={path} variant="secondary" className="text-[10px] px-1.5">
                                     {item.label}
                                   </Badge>
                                 ) : null;
@@ -654,7 +654,7 @@ export default function Configuracoes() {
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm truncate">{u.displayName}</span>
                             <span className="text-xs text-muted-foreground font-mono">@{u.username}</span>
-                            {isMe && <Badge variant="outline" className="text-[10px] px-1.5">você</Badge>}
+                            {isMe && <Badge variant="secondary" className="text-[10px] px-1.5">você</Badge>}
                           </div>
                           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                             <Badge
