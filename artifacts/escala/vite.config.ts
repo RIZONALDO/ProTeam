@@ -66,6 +66,9 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    proxy: process.env.REPL_ID === undefined
+      ? { "/api": { target: "http://localhost:8082", changeOrigin: true } }
+      : undefined,
   },
   preview: {
     port,
