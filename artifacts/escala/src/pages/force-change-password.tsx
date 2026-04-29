@@ -18,6 +18,7 @@ export default function ForceChangePassword() {
     { ok: newPassword.length >= 8, label: "Mínimo 8 caracteres" },
     { ok: /[A-Z]/.test(newPassword), label: "Pelo menos 1 letra maiúscula" },
     { ok: /\d/.test(newPassword), label: "Pelo menos 1 número" },
+    { ok: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPassword), label: "Pelo menos 1 caractere especial (!@#$...)" },
   ];
   const allRulesOk = rules.every((r) => r.ok);
 

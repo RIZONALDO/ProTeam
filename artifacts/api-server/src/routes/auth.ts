@@ -78,6 +78,10 @@ router.post("/auth/change-password", requireAuth, async (req, res): Promise<void
     res.status(422).json({ error: "A nova senha deve conter pelo menos um número" });
     return;
   }
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPassword)) {
+    res.status(422).json({ error: "A nova senha deve conter pelo menos um caractere especial" });
+    return;
+  }
 
   const [user] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, userId));
   if (!user || !verifyPassword(currentPassword, user.passwordHash)) {

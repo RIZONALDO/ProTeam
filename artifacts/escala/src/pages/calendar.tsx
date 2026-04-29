@@ -53,7 +53,10 @@ import {
   LayoutList,
   LayoutGrid,
   Users,
+  Wand2,
+  RefreshCw,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -394,11 +397,14 @@ function CalendarDay({
             <button
               onClick={(e) => { e.stopPropagation(); setLocalExpanded((v) => !v); }}
               title={localExpanded ? "Ocultar integrantes" : "Ver integrantes"}
-              className={`rounded p-0.5 transition-colors hover:bg-muted
-                ${localExpanded ? "text-primary" : "text-muted-foreground hover:text-foreground"}
-                md:opacity-0 md:group-hover:opacity-100 opacity-100 transition-opacity`}
+              className={`rounded px-1.5 py-0.5 text-[10px] font-semibold flex items-center gap-1 transition-colors
+                ${localExpanded
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-primary/15 text-primary hover:bg-primary/25"
+                }`}
             >
               <Users className="h-3 w-3" />
+              <span className="hidden sm:inline">{localExpanded ? "Ocultar" : "Ver"}</span>
             </button>
           )}
           {/* Indicador "abrir" — aparece no hover em desktop */}
@@ -578,7 +584,7 @@ function DayDialog({
                     members.map((member) => {
                       const override = duoOverrides.find((o) => o.replacedMemberId === member.id);
                       return (
-                        <div key={member.id} className="flex items-center gap-2 group/member">
+                        <div key={member.id} className="flex items-center gap-2">
                           {override ? (
                             <div className="flex items-center gap-1.5 flex-1 min-w-0">
                               <UserCheck className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
@@ -595,26 +601,39 @@ function DayDialog({
                             </div>
                           )}
                           {canSubstitute && (
-                            <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover/member:opacity-100 transition-opacity">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 text-primary hover:text-primary hover:bg-primary/10"
-                                title={override ? "Editar substituição" : "Substituir integrante"}
-                                onClick={() => openSubForm(duo, member, override)}
-                              >
-                                <ArrowLeftRight className="h-3 w-3" />
-                              </Button>
-                              {override && (
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {override ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-1.5 text-[10px] gap-1 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                    title="Editar substituição"
+                                    onClick={() => openSubForm(duo, member, override)}
+                                  >
+                                    <ArrowLeftRight className="h-2.5 w-2.5" />
+                                    Editar
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    title="Remover substituição"
+                                    disabled={deletingId === override.id}
+                                    onClick={() => handleDeleteOverride(override.id)}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </>
+                              ) : (
                                 <Button
                                   size="icon"
-                                  variant="ghost"
-                                  className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  title="Remover substituição"
-                                  disabled={deletingId === override.id}
-                                  onClick={() => handleDeleteOverride(override.id)}
+                                  variant="outline"
+                                  className="h-6 w-6 text-muted-foreground hover:text-primary hover:border-primary/40"
+                                  title="Substituir integrante"
+                                  onClick={() => openSubForm(duo, member, override)}
                                 >
-                                  <Trash2 className="h-3 w-3" />
+                                  <ArrowLeftRight className="h-3 w-3" />
                                 </Button>
                               )}
                             </div>
@@ -716,6 +735,21 @@ function DayDialog({
   );
 }
 
+function generateMonthRotation(
+  day1: { mainDuoId: number; sideDuoId: number; offDuoId: number; mainDuo: Duo | null; sideDuo: Duo | null; offDuo: Duo | null },
+  days: Date[]
+): Record<string, DaySchedule> {
+  const result: Record<string, DaySchedule> = {};
+  let cur = { mainDuoId: day1.mainDuoId, sideDuoId: day1.sideDuoId, offDuoId: day1.offDuoId, mainDuo: day1.mainDuo, sideDuo: day1.sideDuo, offDuo: day1.offDuo };
+  for (const date of days) {
+    const dateStr = format(date, "yyyy-MM-dd");
+    result[dateStr] = { date: dateStr, ...cur };
+    const next = { mainDuoId: cur.sideDuoId, sideDuoId: cur.offDuoId, offDuoId: cur.mainDuoId, mainDuo: cur.sideDuo, sideDuo: cur.offDuo, offDuo: cur.mainDuo };
+    cur = next;
+  }
+  return result;
+}
+
 export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [activeDuo, setActiveDuo] = useState<Duo | null>(null);
@@ -725,6 +759,11 @@ export default function Calendar() {
   const [dayOverrides, setDayOverrides] = useState<DayOverride[]>([]);
   const [loadingOverrides, setLoadingOverrides] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [showRotationDialog, setShowRotationDialog] = useState(false);
+  const [rotationOverwrite, setRotationOverwrite] = useState(false);
+  const [rotStartMain, setRotStartMain] = useState<string>("");
+  const [rotStartSide, setRotStartSide] = useState<string>("");
+  const [rotStartOff, setRotStartOff] = useState<string>("");
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
@@ -922,6 +961,79 @@ export default function Calendar() {
 
   const hasPendingChanges = Object.keys(localSchedules).length > 0;
 
+  const day1Str = format(monthStart, "yyyy-MM-dd");
+  const day1Schedule = getMergedSchedule(day1Str);
+  const day1Complete =
+    day1Schedule != null &&
+    day1Schedule.mainDuoId != null &&
+    day1Schedule.sideDuoId != null &&
+    day1Schedule.offDuoId != null;
+
+  function openRotationDialog() {
+    setRotationOverwrite(false);
+    if (day1Complete && day1Schedule) {
+      setRotStartMain(String(day1Schedule.mainDuoId ?? ""));
+      setRotStartSide(String(day1Schedule.sideDuoId ?? ""));
+      setRotStartOff(String(day1Schedule.offDuoId ?? ""));
+    } else {
+      setRotStartMain("");
+      setRotStartSide("");
+      setRotStartOff("");
+    }
+    setShowRotationDialog(true);
+  }
+
+  function handleApplyRotation() {
+    const mainId = Number(rotStartMain);
+    const sideId = Number(rotStartSide);
+    const offId = Number(rotStartOff);
+    if (!mainId || !sideId || !offId) return;
+    const duoById = (id: number) => duos?.find((d) => d.id === id) ?? null;
+    const day1 = {
+      mainDuoId: mainId,
+      sideDuoId: sideId,
+      offDuoId: offId,
+      mainDuo: duoById(mainId) as Duo | null,
+      sideDuo: duoById(sideId) as Duo | null,
+      offDuo: duoById(offId) as Duo | null,
+    };
+    const generated = generateMonthRotation(day1, days);
+    setLocalSchedules((prev) => {
+      const merged = { ...prev };
+      for (const [dateStr, sched] of Object.entries(generated)) {
+        if (!rotationOverwrite) {
+          const existing = getMergedScheduleAt(dateStr, prev);
+          if (existing?.mainDuoId || existing?.sideDuoId || existing?.offDuoId) continue;
+        }
+        merged[dateStr] = {
+          ...(merged[dateStr] ?? { date: dateStr }),
+          ...sched,
+        };
+      }
+      return merged;
+    });
+    setShowRotationDialog(false);
+    toast.success("Rotação aplicada! Revise e salve as alterações.");
+  }
+
+  function getMergedScheduleAt(dateStr: string, localOverride: Record<string, DaySchedule>): DaySchedule | undefined {
+    const api = scheduleMap.get(dateStr);
+    const local = localOverride[dateStr];
+    if (!local && !api) return undefined;
+    if (!local) return api;
+    const duoById = (id?: number | null) => duos?.find((d) => d.id === id) ?? null;
+    return {
+      date: dateStr,
+      mainDuoId: local.mainDuoId ?? api?.mainDuoId,
+      sideDuoId: local.sideDuoId ?? api?.sideDuoId,
+      offDuoId: local.offDuoId ?? api?.offDuoId,
+      mainDuo: duoById(local.mainDuoId !== undefined ? local.mainDuoId : api?.mainDuoId),
+      sideDuo: duoById(local.sideDuoId !== undefined ? local.sideDuoId : api?.sideDuoId),
+      offDuo: duoById(local.offDuoId !== undefined ? local.offDuoId : api?.offDuoId),
+      notes: local.notes !== undefined ? local.notes : api?.notes,
+    };
+  }
+
   async function handleSave() {
     const allSchedules = new Map<string, DaySchedule>();
     schedules?.forEach((s) => allSchedules.set(s.date, s as DaySchedule));
@@ -1029,6 +1141,22 @@ export default function Calendar() {
             <p className="text-muted-foreground mt-1">Arraste as duplas para definir a escala diária.</p>
           </div>
           <div className="flex items-center gap-3">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10 hover:text-primary"
+                  onClick={openRotationDialog}
+                >
+                  <Wand2 className="h-3.5 w-3.5" />
+                  Preencher mês
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="text-xs max-w-[200px] text-center">
+                Preencher automaticamente o mês com rotação de duplas
+              </TooltipContent>
+            </Tooltip>
             {hasPendingChanges && (
               <>
                 <Button variant="outline" size="sm" onClick={handleDiscard}>
@@ -1219,6 +1347,85 @@ export default function Calendar() {
         onDeleteOverride={handleDeleteOverride}
       />
     )}
+
+    <Dialog open={showRotationDialog} onOpenChange={setShowRotationDialog}>
+      <DialogContent className="max-w-sm rounded-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Wand2 className="h-4 w-4 text-primary" />
+            Preencher mês com rotação
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 text-sm">
+          <p className="text-muted-foreground text-xs">
+            Defina a escala do <strong className="text-foreground">dia 1 de {format(currentDate, "MMMM", { locale: ptBR })}</strong> como ponto de partida. O sistema aplicará a rotação nos demais dias automaticamente.
+          </p>
+
+          <div className="space-y-2.5">
+            {([
+              { label: "Principal", value: rotStartMain, set: setRotStartMain },
+              { label: "Lateral",   value: rotStartSide, set: setRotStartSide },
+              { label: "Folga",     value: rotStartOff,  set: setRotStartOff  },
+            ] as { label: string; value: string; set: (v: string) => void }[]).map(({ label, value, set }) => (
+              <div key={label} className="grid grid-cols-[80px_1fr] items-center gap-2">
+                <Label className="text-xs text-right">{label}</Label>
+                <Select value={value} onValueChange={set}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {duos?.map((d) => (
+                      <SelectItem key={d.id} value={String(d.id)} className="text-xs">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: (d as Duo).color || "#ccc" }} />
+                          {d.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+            {rotStartMain && rotStartSide && rotStartOff &&
+             (rotStartMain === rotStartSide || rotStartMain === rotStartOff || rotStartSide === rotStartOff) && (
+              <p className="text-[11px] text-destructive">Cada papel deve ter uma dupla diferente.</p>
+            )}
+          </div>
+
+          <p className="text-[11px] text-muted-foreground border-t pt-2">
+            Padrão de rotação: Lateral→Principal, Folga→Lateral, Principal→Folga a cada dia.
+          </p>
+
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="overwrite"
+              checked={rotationOverwrite}
+              onCheckedChange={(v) => setRotationOverwrite(Boolean(v))}
+            />
+            <label htmlFor="overwrite" className="text-sm cursor-pointer select-none">
+              Sobrescrever dias já preenchidos
+            </label>
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowRotationDialog(false)}>
+            Cancelar
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleApplyRotation}
+            disabled={
+              !rotStartMain || !rotStartSide || !rotStartOff ||
+              rotStartMain === rotStartSide || rotStartMain === rotStartOff || rotStartSide === rotStartOff
+            }
+            className="gap-1.5"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Aplicar rotação
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }

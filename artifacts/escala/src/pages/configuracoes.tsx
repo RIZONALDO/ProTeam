@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -34,8 +34,11 @@ import {
   ImagePlus,
   X,
   ShieldHalf,
+  RefreshCw,
+  Check,
 } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
+import { Switch } from "@/components/ui/switch";
 
 type AppUser = {
   id: number;
@@ -78,16 +81,42 @@ function generateId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+const SPECIAL_CHARS = "!@#$%&*-_+=?";
+const UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const LOWER = "abcdefghijklmnopqrstuvwxyz";
+const DIGITS = "0123456789";
+
+function generatePassword(): string {
+  const rand = (s: string) => s[Math.floor(Math.random() * s.length)];
+  const all = UPPER + LOWER + DIGITS + SPECIAL_CHARS;
+  const required = [rand(UPPER), rand(DIGITS), rand(SPECIAL_CHARS)];
+  const extra = Array.from({ length: 7 }, () => rand(all));
+  const combined = [...required, ...extra];
+  for (let i = combined.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [combined[i], combined[j]] = [combined[j]!, combined[i]!];
+  }
+  return combined.join("");
+}
+
 export default function Configuracoes() {
   const { user: currentUser } = useAuth();
+  const { refreshSettings } = useSettings();
 
-  const [companyName, setCompanyName] = useState("");
-  const [companyNameInput, setCompanyNameInput] = useState("");
-  const [appLogo, setAppLogo] = useState<string | null>(null);
-  const [appLogoPreview, setAppLogoPreview] = useState<string | null>(null);
-  const [savingLogo, setSavingLogo] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [customForm, setCustomForm] = useState({
+    company_name: "",
+    system_name: "",
+    logo_principal: "",
+    logo_icone: "",
+    favicon_url: "",
+    primary_color: "#f59e0b",
+    secondary_color: "#1e293b",
+    footer_text: "",
+  });
+  const [logoPrincipalDrag, setLogoPrincipalDrag] = useState(false);
+  const [logoIconeDrag, setLogoIconeDrag] = useState(false);
 
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -117,10 +146,16 @@ export default function Configuracoes() {
     apiFetch("/api/settings")
       .then((r) => r.json())
       .then((data: Record<string, string>) => {
-        const name = data["company_name"] ?? "";
-        setCompanyName(name);
-        setCompanyNameInput(name);
-        if (data["app_logo"]) setAppLogo(data["app_logo"]);
+        setCustomForm({
+          company_name: data["company_name"] ?? "",
+          system_name: data["system_name"] ?? "",
+          logo_principal: data["logo_principal"] ?? "",
+          logo_icone: data["app_logo"] ?? data["logo_icone"] ?? "",
+          favicon_url: data["favicon_url"] ?? "",
+          primary_color: data["primary_color"] ?? "#f59e0b",
+          secondary_color: data["secondary_color"] ?? "#1e293b",
+          footer_text: data["footer_text"] ?? "",
+        });
         if (data["access_profiles"]) {
           try {
             setProfiles(JSON.parse(data["access_profiles"]));
@@ -139,7 +174,7 @@ export default function Configuracoes() {
     setLoadingUsers(true);
     apiFetch("/api/users")
       .then((r) => r.json())
-      .then(setUsers)
+      .then((data) => setUsers(Array.isArray(data) ? data : []))
       .catch(() => toast.error("Erro ao carregar usuários"))
       .finally(() => setLoadingUsers(false));
   }
@@ -203,53 +238,63 @@ export default function Configuracoes() {
     }));
   }
 
-  function handleLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function readFileAsBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      if (file.size > 1024 * 1024) { reject(new Error("Imagem muito grande. Use até 1 MB.")); return; }
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleLogoFileChange(field: "logo_principal" | "logo_icone", e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 512 * 1024) {
-      toast.error("Imagem muito grande. Use até 512 KB.");
-      return;
+    try {
+      const b64 = await readFileAsBase64(file);
+      setCustomForm((f) => ({ ...f, [field]: b64 }));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao ler imagem");
     }
-    const reader = new FileReader();
-    reader.onload = () => setAppLogoPreview(reader.result as string);
-    reader.readAsDataURL(file);
     e.target.value = "";
   }
 
-  async function saveAppLogo(logoData: string | null) {
-    setSavingLogo(true);
+  async function handleLogoDrop(field: "logo_principal" | "logo_icone", e: React.DragEvent) {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
     try {
-      const res = await apiFetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ app_logo: logoData ?? "" }),
-      });
-      if (!res.ok) throw new Error();
-      setAppLogo(logoData);
-      setAppLogoPreview(null);
-      const link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
-      if (link) link.href = logoData ?? "/favicon.svg";
-      toast.success(logoData ? "Ícone atualizado!" : "Ícone removido.");
-    } catch {
-      toast.error("Erro ao salvar ícone");
-    } finally {
-      setSavingLogo(false);
+      const b64 = await readFileAsBase64(file);
+      setCustomForm((f) => ({ ...f, [field]: b64 }));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao ler imagem");
     }
   }
 
-  async function saveCompanyName() {
+  async function saveCustomization() {
     setSavingSettings(true);
     try {
       const res = await apiFetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_name: companyNameInput }),
+        body: JSON.stringify({
+          company_name: customForm.company_name,
+          system_name: customForm.system_name,
+          logo_principal: customForm.logo_principal,
+          app_logo: customForm.logo_icone,
+          logo_icone: customForm.logo_icone,
+          favicon_url: customForm.favicon_url,
+          primary_color: customForm.primary_color,
+          secondary_color: customForm.secondary_color,
+          footer_text: customForm.footer_text,
+        }),
       });
       if (!res.ok) throw new Error();
-      setCompanyName(companyNameInput);
-      toast.success("Nome da empresa atualizado!");
+      await refreshSettings();
+      toast.success("Personalização salva!");
     } catch {
-      toast.error("Erro ao salvar configurações");
+      toast.error("Erro ao salvar personalização");
     } finally {
       setSavingSettings(false);
     }
@@ -257,7 +302,7 @@ export default function Configuracoes() {
 
   function openNewUser() {
     setEditingUser(null);
-    setUserForm({ username: "", displayName: "", password: "", role: "user", profileId: "", permissions: [] });
+    setUserForm({ username: "", displayName: "", password: generatePassword(), role: "user", profileId: "", permissions: [] });
     setShowUserDialog(true);
   }
 
@@ -323,6 +368,10 @@ export default function Configuracoes() {
       }
       if (!/\d/.test(userForm.password)) {
         toast.error("A senha deve conter pelo menos um número");
+        return;
+      }
+      if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(userForm.password)) {
+        toast.error("A senha deve conter pelo menos um caractere especial");
         return;
       }
     }
@@ -410,120 +459,205 @@ export default function Configuracoes() {
         </TabsList>
 
         {/* ── General tab ── */}
-        <TabsContent value="geral" className="mt-4 space-y-4">
-          <Card className="rounded-xl max-w-lg">
-            <CardHeader>
-              <CardTitle className="text-base">Nome do Aplicativo</CardTitle>
-              <CardDescription>Exibido no topo do menu lateral e na tela de login</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {loadingSettings ? (
-                <Skeleton className="h-9 w-full" />
-              ) : (
-                <>
+        <TabsContent value="geral" className="mt-4">
+          {loadingSettings ? (
+            <div className="space-y-4 max-w-2xl">
+              {[1,2,3,4].map((i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
+            </div>
+          ) : (
+            <div className="max-w-2xl space-y-6">
+
+              {/* ── Identidade da Empresa ── */}
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-base font-semibold">Identidade da Empresa</h2>
+                  <p className="text-sm text-muted-foreground">Nome e identidade visual exibidos em todo o sistema.</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="company-name">Nome</Label>
+                    <Label>Nome da empresa</Label>
                     <Input
-                      id="company-name"
-                      value={companyNameInput}
-                      onChange={(e) => setCompanyNameInput(e.target.value)}
-                      placeholder="Nome do aplicativo..."
+                      value={customForm.company_name}
+                      onChange={(e) => setCustomForm((f) => ({ ...f, company_name: e.target.value }))}
+                      placeholder="Ex: Nagibe Produção"
                     />
                   </div>
-                  <Button
-                    onClick={saveCompanyName}
-                    disabled={savingSettings || companyNameInput === companyName}
+                  <div className="space-y-1.5">
+                    <Label>Nome do sistema</Label>
+                    <Input
+                      value={customForm.system_name}
+                      onChange={(e) => setCustomForm((f) => ({ ...f, system_name: e.target.value }))}
+                      placeholder="Ex: ProTeam"
+                    />
+                  </div>
+                </div>
+
+                {/* Logo principal */}
+                <div className="space-y-2">
+                  <Label>Logo principal</Label>
+                  <label
+                    htmlFor="logo-principal-file"
+                    onDragOver={(e) => { e.preventDefault(); setLogoPrincipalDrag(true); }}
+                    onDragLeave={() => setLogoPrincipalDrag(false)}
+                    onDrop={(e) => { setLogoPrincipalDrag(false); handleLogoDrop("logo_principal", e); }}
+                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed cursor-pointer transition-colors h-28 ${logoPrincipalDrag ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:bg-muted/40"}`}
                   >
-                    {savingSettings ? "Salvando..." : "Salvar"}
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                    {customForm.logo_principal ? (
+                      <img src={customForm.logo_principal} alt="Logo principal" className="max-h-20 max-w-full object-contain rounded" />
+                    ) : (
+                      <>
+                        <ImagePlus className="h-7 w-7 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground font-medium">Clique para escolher uma imagem</span>
+                        <span className="text-xs text-muted-foreground">ou arraste e solte aqui</span>
+                        <span className="text-xs text-muted-foreground/60">PNG, JPG, SVG, WEBP</span>
+                      </>
+                    )}
+                    <input id="logo-principal-file" type="file" accept="image/*" className="hidden"
+                      onChange={(e) => handleLogoFileChange("logo_principal", e)} />
+                  </label>
+                  {customForm.logo_principal && (
+                    <button type="button" className="text-xs text-destructive hover:underline flex items-center gap-1"
+                      onClick={() => setCustomForm((f) => ({ ...f, logo_principal: "" }))}>
+                      <X className="h-3 w-3" /> Remover
+                    </button>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs text-muted-foreground">ou cole uma URL</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                  <Input
+                    value={customForm.logo_principal.startsWith("data:") ? "" : customForm.logo_principal}
+                    onChange={(e) => setCustomForm((f) => ({ ...f, logo_principal: e.target.value }))}
+                    placeholder="https://..."
+                  />
+                  <p className="text-xs text-muted-foreground">Exibida na tela de login e cabeçalho. Recomendado: 200×60px, fundo transparente.</p>
+                </div>
 
-          <Card className="rounded-xl max-w-lg">
-            <CardHeader>
-              <CardTitle className="text-base">Ícone do Aplicativo</CardTitle>
-              <CardDescription>
-                Aparece no menu lateral, na tela de login e na aba do navegador. PNG ou SVG, até 512 KB.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {loadingSettings ? (
-                <Skeleton className="h-20 w-20 rounded-xl" />
-              ) : (
-                <>
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      {(appLogoPreview ?? appLogo) ? (
-                        <img
-                          src={appLogoPreview ?? appLogo!}
-                          alt="Logo"
-                          className="h-16 w-16 object-contain rounded-xl border border-border"
-                        />
-                      ) : (
-                        <div className="h-16 w-16 rounded-xl border-2 border-dashed border-border flex items-center justify-center bg-muted/40">
-                          <ImagePlus className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                      )}
-                      {appLogoPreview && (
-                        <span className="absolute -top-1.5 -right-1.5 text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-medium leading-none">
-                          novo
-                        </span>
-                      )}
-                    </div>
+                {/* Logo reduzida */}
+                <div className="space-y-2">
+                  <Label>Logo reduzida (ícone)</Label>
+                  <label
+                    htmlFor="logo-icone-file"
+                    onDragOver={(e) => { e.preventDefault(); setLogoIconeDrag(true); }}
+                    onDragLeave={() => setLogoIconeDrag(false)}
+                    onDrop={(e) => { setLogoIconeDrag(false); handleLogoDrop("logo_icone", e); }}
+                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed cursor-pointer transition-colors h-28 ${logoIconeDrag ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:bg-muted/40"}`}
+                  >
+                    {customForm.logo_icone ? (
+                      <img src={customForm.logo_icone} alt="Logo ícone" className="max-h-20 max-w-full object-contain rounded" />
+                    ) : (
+                      <>
+                        <ImagePlus className="h-7 w-7 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground font-medium">Clique para escolher uma imagem</span>
+                        <span className="text-xs text-muted-foreground">ou arraste e solte aqui</span>
+                        <span className="text-xs text-muted-foreground/60">PNG, JPG, SVG, WEBP</span>
+                      </>
+                    )}
+                    <input id="logo-icone-file" type="file" accept="image/*" className="hidden"
+                      onChange={(e) => handleLogoFileChange("logo_icone", e)} />
+                  </label>
+                  {customForm.logo_icone && (
+                    <button type="button" className="text-xs text-destructive hover:underline flex items-center gap-1"
+                      onClick={() => setCustomForm((f) => ({ ...f, logo_icone: "" }))}>
+                      <X className="h-3 w-3" /> Remover
+                    </button>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs text-muted-foreground">ou cole uma URL</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                  <Input
+                    value={customForm.logo_icone.startsWith("data:") ? "" : customForm.logo_icone}
+                    onChange={(e) => setCustomForm((f) => ({ ...f, logo_icone: e.target.value }))}
+                    placeholder="https://..."
+                  />
+                  <p className="text-xs text-muted-foreground">Exibida na sidebar mobile. Recomendado: 40×40px quadrado.</p>
+                </div>
 
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="logo-upload"
-                        className="cursor-pointer inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-                      >
-                        <ImagePlus className="h-4 w-4" />
-                        {appLogo ? "Trocar ícone" : "Carregar ícone"}
-                      </Label>
+                {/* Favicon URL */}
+                <div className="space-y-1.5">
+                  <Label>URL do favicon</Label>
+                  <Input
+                    value={customForm.favicon_url}
+                    onChange={(e) => setCustomForm((f) => ({ ...f, favicon_url: e.target.value }))}
+                    placeholder="https://..."
+                  />
+                  <p className="text-xs text-muted-foreground">Ícone exibido na aba do navegador. Tamanho: 32×32px.</p>
+                </div>
+              </div>
+
+              <div className="border-t" />
+
+              {/* ── Cores do Sistema ── */}
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-base font-semibold">Cores do Sistema</h2>
+                  <p className="text-sm text-muted-foreground">Cores exibidas no cabeçalho, sidebar e botões.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Cor principal</Label>
+                    <div className="flex items-center gap-2">
                       <input
-                        id="logo-upload"
-                        type="file"
-                        accept="image/png,image/svg+xml,image/jpeg,image/webp"
-                        className="hidden"
-                        onChange={handleLogoFile}
+                        type="color"
+                        value={customForm.primary_color}
+                        onChange={(e) => setCustomForm((f) => ({ ...f, primary_color: e.target.value }))}
+                        className="h-9 w-12 rounded-lg border border-border cursor-pointer bg-transparent p-0.5"
                       />
-                      {appLogo && !appLogoPreview && (
-                        <button
-                          onClick={() => saveAppLogo(null)}
-                          disabled={savingLogo}
-                          className="flex items-center gap-1.5 text-xs text-destructive hover:underline"
-                        >
-                          <X className="h-3 w-3" />
-                          Remover ícone
-                        </button>
-                      )}
+                      <Input
+                        value={customForm.primary_color}
+                        onChange={(e) => setCustomForm((f) => ({ ...f, primary_color: e.target.value }))}
+                        placeholder="#f59e0b"
+                        className="font-mono text-sm"
+                      />
                     </div>
                   </div>
-
-                  {appLogoPreview && (
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => saveAppLogo(appLogoPreview)}
-                        disabled={savingLogo}
-                      >
-                        {savingLogo ? "Salvando..." : "Confirmar ícone"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setAppLogoPreview(null)}
-                        disabled={savingLogo}
-                      >
-                        Cancelar
-                      </Button>
+                  <div className="space-y-1.5">
+                    <Label>Cor secundária</Label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={customForm.secondary_color}
+                        onChange={(e) => setCustomForm((f) => ({ ...f, secondary_color: e.target.value }))}
+                        className="h-9 w-12 rounded-lg border border-border cursor-pointer bg-transparent p-0.5"
+                      />
+                      <Input
+                        value={customForm.secondary_color}
+                        onChange={(e) => setCustomForm((f) => ({ ...f, secondary_color: e.target.value }))}
+                        placeholder="#1e293b"
+                        className="font-mono text-sm"
+                      />
                     </div>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t" />
+
+              {/* ── Rodapé ── */}
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-base font-semibold">Rodapé</h2>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Texto do rodapé (opcional)</Label>
+                  <Input
+                    value={customForm.footer_text}
+                    onChange={(e) => setCustomForm((f) => ({ ...f, footer_text: e.target.value }))}
+                    placeholder="© 2024 Sua Empresa. Todos os direitos reservados."
+                  />
+                </div>
+              </div>
+
+              {/* Save button */}
+              <Button onClick={saveCustomization} disabled={savingSettings} className="w-full sm:w-auto">
+                {savingSettings ? "Salvando..." : "Salvar personalização"}
+              </Button>
+            </div>
+          )}
         </TabsContent>
 
         {/* ── Access Profiles tab ── */}
@@ -703,7 +837,7 @@ export default function Configuracoes() {
 
       {/* ── Profile Dialog ── */}
       <Dialog open={showProfileDialog} onOpenChange={setShowProfileDialog}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingProfile ? "Editar perfil" : "Novo perfil de acesso"}</DialogTitle>
           </DialogHeader>
@@ -717,37 +851,48 @@ export default function Configuracoes() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Itens de menu visíveis</Label>
-              <div className="rounded-xl border p-3 space-y-2.5">
-                {ALL_MENU_ITEMS.map((item) => (
-                  <div key={item.path} className="flex items-center gap-2.5">
-                    <Checkbox
-                      id={`pfperm-${item.path}`}
-                      checked={profileForm.permissions.includes(item.path)}
-                      onCheckedChange={() => toggleProfilePerm(item.path)}
-                    />
-                    <label htmlFor={`pfperm-${item.path}`} className="text-sm cursor-pointer select-none">
-                      {item.label}
-                    </label>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between">
+                <Label>Permissões por módulo</Label>
+                <div className="flex gap-3">
+                  <button type="button" className="text-xs text-primary hover:underline"
+                    onClick={() => setProfileForm((f) => ({ ...f, permissions: ALL_MENU_ITEMS.map((m) => m.path) }))}>
+                    Todos
+                  </button>
+                  <button type="button" className="text-xs text-muted-foreground hover:underline"
+                    onClick={() => setProfileForm((f) => ({ ...f, permissions: [] }))}>
+                    Nenhum
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  className="text-xs text-primary hover:underline"
-                  onClick={() => setProfileForm((f) => ({ ...f, permissions: ALL_MENU_ITEMS.map((m) => m.path) }))}
-                >
-                  Selecionar todos
-                </button>
-                <span className="text-xs text-muted-foreground">·</span>
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground hover:underline"
-                  onClick={() => setProfileForm((f) => ({ ...f, permissions: [] }))}
-                >
-                  Limpar
-                </button>
+              <div className="rounded-xl border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/60 border-b">
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Módulo</th>
+                      <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground w-16">Acesso</th>
+                      <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground w-12">Todos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ALL_MENU_ITEMS.map((item, idx) => {
+                      const on = profileForm.permissions.includes(item.path);
+                      return (
+                        <tr key={item.path} className={`border-b last:border-0 ${idx % 2 === 0 ? "" : "bg-muted/20"}`}>
+                          <td className="px-3 py-2.5 text-sm">{item.label}</td>
+                          <td className="text-center px-3 py-2.5">
+                            <Switch
+                              checked={on}
+                              onCheckedChange={() => toggleProfilePerm(item.path)}
+                            />
+                          </td>
+                          <td className="text-center px-3 py-2.5">
+                            {on && <Check className="h-3.5 w-3.5 text-primary mx-auto" />}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -762,7 +907,7 @@ export default function Configuracoes() {
 
       {/* ── User Dialog ── */}
       <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingUser ? "Editar usuário" : "Novo usuário"}</DialogTitle>
           </DialogHeader>
@@ -786,7 +931,17 @@ export default function Configuracoes() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>{editingUser ? "Nova senha (deixe em branco para manter)" : "Senha *"}</Label>
+              <div className="flex items-center justify-between">
+                <Label>{editingUser ? "Nova senha (deixe em branco para manter)" : "Senha *"}</Label>
+                <button
+                  type="button"
+                  onClick={() => setUserForm((f) => ({ ...f, password: generatePassword() }))}
+                  className="flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Gerar senha
+                </button>
+              </div>
               <PasswordInput
                 value={userForm.password}
                 onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
@@ -799,6 +954,7 @@ export default function Configuracoes() {
                     { ok: userForm.password.length >= 8, label: "Mínimo 8 caracteres" },
                     { ok: /[A-Z]/.test(userForm.password), label: "Pelo menos 1 letra maiúscula" },
                     { ok: /\d/.test(userForm.password), label: "Pelo menos 1 número" },
+                    { ok: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(userForm.password), label: "Pelo menos 1 caractere especial" },
                   ].map(({ ok, label }) => (
                     <div key={label} className={`flex items-center gap-1.5 text-xs ${ok ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
                       <span className={`inline-block h-1.5 w-1.5 rounded-full flex-shrink-0 ${ok ? "bg-green-500" : "bg-muted-foreground/40"}`} />
@@ -845,38 +1001,49 @@ export default function Configuracoes() {
                   )}
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Itens de menu visíveis</Label>
-                  <div className="rounded-xl border p-3 space-y-2">
-                    {ALL_MENU_ITEMS.map((item) => (
-                      <div key={item.path} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`uperm-${item.path}`}
-                          checked={userForm.permissions.includes(item.path)}
-                          onCheckedChange={() => toggleUserPermission(item.path)}
-                        />
-                        <label htmlFor={`uperm-${item.path}`} className="text-sm cursor-pointer select-none">
-                          {item.label}
-                        </label>
-                      </div>
-                    ))}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-muted-foreground">Permissões por módulo</Label>
+                    <div className="flex gap-3">
+                      <button type="button" className="text-xs text-primary hover:underline"
+                        onClick={() => setUserForm((f) => ({ ...f, profileId: "custom", permissions: ALL_MENU_ITEMS.map((m) => m.path) }))}>
+                        Todos
+                      </button>
+                      <button type="button" className="text-xs text-muted-foreground hover:underline"
+                        onClick={() => setUserForm((f) => ({ ...f, profileId: "", permissions: [] }))}>
+                        Nenhum
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2 pt-0.5">
-                    <button
-                      type="button"
-                      className="text-xs text-primary hover:underline"
-                      onClick={() => setUserForm((f) => ({ ...f, profileId: "custom", permissions: ALL_MENU_ITEMS.map((m) => m.path) }))}
-                    >
-                      Selecionar todos
-                    </button>
-                    <span className="text-xs text-muted-foreground">·</span>
-                    <button
-                      type="button"
-                      className="text-xs text-muted-foreground hover:underline"
-                      onClick={() => setUserForm((f) => ({ ...f, profileId: "", permissions: [] }))}
-                    >
-                      Limpar
-                    </button>
+                  <div className="rounded-xl border overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted/60 border-b">
+                          <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Módulo</th>
+                          <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground w-16">Acesso</th>
+                          <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground w-12">Todos</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ALL_MENU_ITEMS.map((item, idx) => {
+                          const on = userForm.permissions.includes(item.path);
+                          return (
+                            <tr key={item.path} className={`border-b last:border-0 ${idx % 2 === 0 ? "" : "bg-muted/20"}`}>
+                              <td className="px-3 py-2.5 text-sm">{item.label}</td>
+                              <td className="text-center px-3 py-2.5">
+                                <Switch
+                                  checked={on}
+                                  onCheckedChange={() => toggleUserPermission(item.path)}
+                                />
+                              </td>
+                              <td className="text-center px-3 py-2.5">
+                                {on && <Check className="h-3.5 w-3.5 text-primary mx-auto" />}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>

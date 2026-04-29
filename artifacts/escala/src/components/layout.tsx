@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -19,9 +20,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { toast } from "sonner";
 
 const NAV_ITEMS = [
@@ -40,31 +41,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [companyName, setCompanyName] = useState<string | null>(null);
-  const [appLogo, setAppLogo] = useState<string | null>(null);
 
   const { user, logout, hasPermission } = useAuth();
   const { theme, toggleTheme } = useTheme();
-
-  useEffect(() => {
-    fetch("/api/settings", { credentials: "include" })
-      .then((r) => r.ok ? r.json() : null)
-      .then((data: Record<string, string> | null) => {
-        if (data?.["company_name"]) setCompanyName(data["company_name"]);
-        if (data?.["app_logo"]) {
-          setAppLogo(data["app_logo"]);
-          const link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
-          if (link) link.href = data["app_logo"];
-        }
-      })
-      .catch(() => {});
-  }, []);
+  const { settings } = useSettings();
 
   const visibleNavItems = NAV_ITEMS.filter((item) => hasPermission(item.href));
   const showSettings = user?.role === "admin";
   const allItems = showSettings ? [...visibleNavItems, SETTINGS_ITEM] : visibleNavItems;
 
-  const displayName = companyName ?? "ProTeam";
+  const displayName = settings.company_name || "ProTeam";
+  const appLogo = settings.logo_icone || settings.app_logo || "";
 
   async function handleLogout() {
     try {
