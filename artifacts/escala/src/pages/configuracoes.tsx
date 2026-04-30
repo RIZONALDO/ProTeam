@@ -117,6 +117,7 @@ export default function Configuracoes() {
   });
   const [logoPrincipalDrag, setLogoPrincipalDrag] = useState(false);
   const [logoIconeDrag, setLogoIconeDrag] = useState(false);
+  const [faviconDrag, setFaviconDrag] = useState(false);
 
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -248,7 +249,7 @@ export default function Configuracoes() {
     });
   }
 
-  async function handleLogoFileChange(field: "logo_principal" | "logo_icone", e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleLogoFileChange(field: "logo_principal" | "logo_icone" | "favicon_url", e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
@@ -260,7 +261,7 @@ export default function Configuracoes() {
     e.target.value = "";
   }
 
-  async function handleLogoDrop(field: "logo_principal" | "logo_icone", e: React.DragEvent) {
+  async function handleLogoDrop(field: "logo_principal" | "logo_icone" | "favicon_url", e: React.DragEvent) {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;
@@ -577,15 +578,46 @@ export default function Configuracoes() {
                   <p className="text-xs text-muted-foreground">Exibida na sidebar mobile. Recomendado: 40×40px quadrado.</p>
                 </div>
 
-                {/* Favicon URL */}
-                <div className="space-y-1.5">
-                  <Label>URL do favicon</Label>
+                {/* Favicon */}
+                <div className="space-y-2">
+                  <Label>Favicon (ícone da aba do navegador)</Label>
+                  <label
+                    htmlFor="favicon-file"
+                    onDragOver={(e) => { e.preventDefault(); setFaviconDrag(true); }}
+                    onDragLeave={() => setFaviconDrag(false)}
+                    onDrop={(e) => { setFaviconDrag(false); handleLogoDrop("favicon_url", e); }}
+                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed cursor-pointer transition-colors h-28 ${faviconDrag ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:bg-muted/40"}`}
+                  >
+                    {customForm.favicon_url ? (
+                      <img src={customForm.favicon_url} alt="Favicon" className="max-h-20 max-w-full object-contain rounded" />
+                    ) : (
+                      <>
+                        <ImagePlus className="h-7 w-7 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground font-medium">Clique para escolher uma imagem</span>
+                        <span className="text-xs text-muted-foreground">ou arraste e solte aqui</span>
+                        <span className="text-xs text-muted-foreground/60">PNG, ICO, SVG</span>
+                      </>
+                    )}
+                    <input id="favicon-file" type="file" accept="image/*" className="hidden"
+                      onChange={(e) => handleLogoFileChange("favicon_url", e)} />
+                  </label>
+                  {customForm.favicon_url && (
+                    <button type="button" className="text-xs text-destructive hover:underline flex items-center gap-1"
+                      onClick={() => setCustomForm((f) => ({ ...f, favicon_url: "" }))}>
+                      <X className="h-3 w-3" /> Remover
+                    </button>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs text-muted-foreground">ou cole uma URL</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
                   <Input
-                    value={customForm.favicon_url}
+                    value={customForm.favicon_url.startsWith("data:") ? "" : customForm.favicon_url}
                     onChange={(e) => setCustomForm((f) => ({ ...f, favicon_url: e.target.value }))}
                     placeholder="https://..."
                   />
-                  <p className="text-xs text-muted-foreground">Ícone exibido na aba do navegador. Tamanho: 32×32px.</p>
+                  <p className="text-xs text-muted-foreground">Recomendado: PNG quadrado 32×32 ou 64×64 px.</p>
                 </div>
               </div>
 
